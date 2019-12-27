@@ -10,7 +10,7 @@ int main(int argc, char const *argv[])
 { 
 	int sock = 0; 
 	struct sockaddr_in serv_addr; 
-	char *hello = "rm -i kokoDir; cut -f1,3 koko"; 
+	char *hello = "ls -alR /etc/"; 
 	
 	
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
