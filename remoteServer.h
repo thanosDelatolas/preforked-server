@@ -1,8 +1,8 @@
 //Functions...
 
 void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret);
-void server_function();
-void child_function(int this);
+void server_function(int msg_size);
+void child_function(int this,int msg_size);
 void signal_handler(int signum);
 void trim(char * str);
 char** create_commnads_array(char* command,int length,int* commands_number);
@@ -28,4 +28,10 @@ char* server_commands[7]={
 	"timeToStop"
 
 };
+
+typedef struct server_worker_message{
+	char cmd[1024];
+	int receiver_fd;
+	
+}server_worker_msg;
 //...

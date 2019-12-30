@@ -39,6 +39,7 @@ int main(int argc,char *argv[]){
 
     pid_t temp;
     workers_array = (pid_t*)malloc(numChildren*sizeof(pid_t));
+    int msg_size =sizeof(server_worker_msg);
    
     if (workers_array==0){
     	perror("Cant allocate this amaount of memory"); exit(EXIT_FAILURE);
@@ -55,7 +56,7 @@ int main(int argc,char *argv[]){
     	/*child*/
     	else if( temp == 0 ){
     		
-			child_function(i); //never ends
+			child_function(i,msg_size); //never ends
     	}
     	/*parent*/
     	else{
@@ -65,7 +66,7 @@ int main(int argc,char *argv[]){
     	}   
 	} 
 	//only father is here
-	server_function();
+	server_function(msg_size);
 	
 }
 /* 
@@ -112,7 +113,7 @@ void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret){
 
 }
 
-void server_function(){
+void server_function(int msg_size){
 	int new_socket; 
 	struct sockaddr_in address;
     int server_fd;
@@ -136,7 +137,22 @@ void server_function(){
 		read( new_socket , buffer, 1024); 
 		if(strlen(buffer)> 100 )
 			continue;
-		write(pipe_fds[1],buffer,strlen(buffer));
+
+		//create the message
+		server_worker_msg msg;
+		strcpy(msg.cmd,buffer);
+		msg.receiver_fd = new_socket;
+		
+		//declare character buffer (byte array)
+		char buffer_msg[msg_size];
+	 	
+	 	//serialize the struct
+  		memcpy(buffer_msg,&msg,msg_size);
+  		
+  		//write in pipe the serialized struct
+		write(pipe_fds[1],buffer_msg,msg_size);
+
+
 
 	}
     
@@ -150,17 +166,19 @@ void signal_handler(int signum){
 	}
 }
 
-void child_function(int this){
+void child_function(int this,int msg_size){
+	
 	close(pipe_fds[1]); // child doesn't write...
-	char buffer[1024]; // for terminal character
+	char task[msg_size]; 
 	int valdread,length;
 	int working = 0;
 
 	while(1){
-
+		
+		//wait for a task...
 		if(!working){
 
-			valdread=read(pipe_fds[0],buffer,1024);
+			valdread=read(pipe_fds[0],task,msg_size);
 			if(valdread > 0)
 				working = 1;
 		}
@@ -170,10 +188,21 @@ void child_function(int this){
 
 		/*task assigned!*/
 
-		//trim the command
-		buffer[valdread]='\0';
+		task[valdread]='\0';
+
+		//create the struct
+		server_worker_msg msg;
+
+		//desirialize and create the struct
+		memcpy(&msg ,task, msg_size);
+
+		//buffer has the command
+		char buffer [1024]={0};
+		strcpy(buffer,msg.cmd);
+
 		trim(buffer);
 		length = strlen(buffer);
+		
 		int commands_number;
 		char** pipelined_commands = create_commnads_array(buffer,length,&commands_number);
 
@@ -215,7 +244,7 @@ void child_function(int this){
 				char path[1035];
 				/* Read the output a line at a time - output it. */
   				while (fgets(path, sizeof(path), fp) != NULL) {
-    				printf("%s", path);
+    				printf("%s\n", path);
   				}
 
 			  /* close */

@@ -10,8 +10,8 @@ int main(int argc, char const *argv[])
 { 
 	int sock = 0; 
 	struct sockaddr_in serv_addr; 
-	char *hello = "ls -alR /etc/"; 
-	
+	char hello[1024] = "ls"; 
+	//fork();
 	
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 	{ 
@@ -36,7 +36,7 @@ int main(int argc, char const *argv[])
 
 	}
 	
-	write(sock , hello , strlen(hello) );
+	write(sock , hello , 1024 );
 
 	
 	
