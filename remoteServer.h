@@ -14,8 +14,6 @@ FILE* execute(char* command);
 //global variables...
 
 
-pid_t* workers_array;
-
 pid_t parent;
 int pipe_fds[2];
 char* server_commands[7]={
@@ -31,7 +29,7 @@ char* server_commands[7]={
 
 typedef struct server_worker_message{
 	char cmd[1024];
-	int receiver_fd;
+	struct sockaddr_in receiver_addr;
 	
 }server_worker_msg;
 //...

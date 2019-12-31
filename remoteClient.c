@@ -3,42 +3,79 @@
 #include <sys/socket.h> 
 #include <arpa/inet.h> 
 #include <unistd.h> 
-#include <string.h> 
-#define PORT 8080 
+#include <string.h>  
+#include <stdlib.h>
+#include <string.h>
 
-int main(int argc, char const *argv[]) 
-{ 
-	int sock = 0; 
-	struct sockaddr_in serv_addr; 
-	char hello[1024] = "ls"; 
-	//fork();
-	
-	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
-	{ 
-		printf("\n Socket creation error \n"); 
-		return -1; 
-	} 
+void send_commands(char* serverName,int serverPort,char* filename);
+void receive_commands_result(int receivePort);
 
-	serv_addr.sin_family = AF_INET; 
-	serv_addr.sin_port = htons(PORT); 
-	
-	// Convert IPv4 and IPv6 addresses from text to binary form 
-	if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) 
-	{ 
-		printf("\nInvalid address/ Address not supported \n"); 
-		return -1; 
-	} 
+int main(int argc, char *argv[]) 
+{ 	
+	//first input => ./remoteClient
+	if (argc != 5) { perror("Invalid number of input"); exit(EXIT_FAILURE); }
 
-	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
-	{ 
-		printf("\nConnection Failed \n"); 
-		return -1; 
+	char* serverName = argv[1];
+	int serverPort =  atoi(argv[2]);
+	int receivePort = atoi(argv[3]);
+	char* filename = argv[4];
+
+	if( access( filename, R_OK ) == -1 ){
+		printf("Can't find file %s\n",filename );
+		exit(EXIT_FAILURE);
+	}
+	int childpid;
+
+	if((childpid=fork()<0)){
+		perror("fork call");
+		exit(EXIT_FAILURE);
+	}
+	//parent
+	if(childpid>0){
+
+		send_commands(serverName,serverPort,filename);
 
 	}
-	
-	write(sock , hello , 1024 );
+	//child 
+	else {
 
-	
-	
-	return 0; 
-} 
+		receive_commands_result(receivePort);
+	}
+}
+
+void send_commands(char* serverName,int serverPort,char* filename){
+	int sent_commands=0;
+	FILE* fp;
+    char * command = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    int sockfd;
+ 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket call"); exit(EXIT_FAILURE);
+   	}
+
+    fp = fopen(filename, "r");
+	while(1){
+
+		/*end of file*/
+		if ((read = getline(&command, &len, fp)) == -1){
+			fclose(fp);
+			break;
+
+		}
+
+		if(sent_commands == 9){
+			sent_commands = 0;
+			sleep(5);
+		}
+
+	}
+}
+void receive_commands_result(int receivePort){
+
+	while(1){
+		break;
+	}
+
+}

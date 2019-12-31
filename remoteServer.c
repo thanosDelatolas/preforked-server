@@ -37,13 +37,8 @@ int main(int argc,char *argv[]){
     }
     
 
-    pid_t temp;
-    workers_array = (pid_t*)malloc(numChildren*sizeof(pid_t));
     int msg_size =sizeof(server_worker_msg);
-   
-    if (workers_array==0){
-    	perror("Cant allocate this amaount of memory"); exit(EXIT_FAILURE);
-    }
+   	pid_t temp;
    
      /* create numChildren child-process*/
     for (int i = 0; i < numChildren; i++){
@@ -60,8 +55,6 @@ int main(int argc,char *argv[]){
     	}
     	/*parent*/
     	else{
-    		
-    		workers_array[i] = temp;
 
     	}   
 	} 
@@ -115,9 +108,9 @@ void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret){
 
 void server_function(int msg_size){
 	int new_socket; 
-	struct sockaddr_in address;
+	struct sockaddr_in server_address,client_address;
     int server_fd;
-    int addrlen = sizeof(address); 
+    int addrlen = sizeof(server_address); 
     char buffer[1024];
 
     /* 
@@ -126,11 +119,11 @@ void server_function(int msg_size){
 
     */
 
-    create_TCP_SOCKET(&server_fd, &address);
+    create_TCP_SOCKET(&server_fd, &server_address);
 	
 	while(1){
 
-		if ((new_socket = accept(server_fd, (struct sockaddr *)&address,(socklen_t*)&addrlen))<0) { 
+		if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address,(socklen_t*)&addrlen))<0) { 
 			perror("accept"); 
 			exit(EXIT_FAILURE); 
 		} 
@@ -141,7 +134,7 @@ void server_function(int msg_size){
 		//create the message
 		server_worker_msg msg;
 		strcpy(msg.cmd,buffer);
-		msg.receiver_fd = new_socket;
+		memcpy(&msg.receiver_addr,&client_address,sizeof(client_address));
 		
 		//declare character buffer (byte array)
 		char buffer_msg[msg_size];
@@ -200,6 +193,7 @@ void child_function(int this,int msg_size){
 		char buffer [1024]={0};
 		strcpy(buffer,msg.cmd);
 
+
 		trim(buffer);
 		length = strlen(buffer);
 		
@@ -252,9 +246,6 @@ void child_function(int this,int msg_size){
 
 
 			}
-
-			
-
 
 		}
 		/*task finished!*/
