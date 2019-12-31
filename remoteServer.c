@@ -9,8 +9,12 @@
 #include <signal.h> 
 #include "remoteServer.h"
 #include <sys/wait.h>
+#include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO
+#include <errno.h>  
 
+#define max_clients 10
 int portNumber,numChildren;
+int client_socket[max_clients];
 
 int main(int argc,char *argv[]){
 
@@ -121,30 +125,94 @@ void server_function(int msg_size){
 
     create_TCP_SOCKET(&server_fd, &server_address);
 	
+	//set of socket descriptors  
+    fd_set readfds; 
+   
+
+    //maximum socket descriptor
+    int max_sd=-1; 
+    int activity,sd;
+    //initialise all client_socket[] to 0 so not checked  
+    for (int i = 0; i < max_clients; i++)   
+    {   
+        client_socket[i] = 0;   
+    } 
+
 	while(1){
 
-		if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address,(socklen_t*)&addrlen))<0) { 
-			perror("accept"); 
-			exit(EXIT_FAILURE); 
-		} 
-		read( new_socket , buffer, 1024); 
-		if(strlen(buffer)> 100 )
-			continue;
+		//clear the socket set  
+        FD_ZERO(&readfds);
 
-		//create the message
-		server_worker_msg msg;
-		strcpy(msg.cmd,buffer);
-		memcpy(&msg.receiver_addr,&client_address,sizeof(client_address));
+        //add server socket to set  
+        FD_SET(server_fd, &readfds);
+        max_sd = server_fd;  
+
+        for ( int i = 0 ; i < max_clients ; i++){   
+            //socket descriptor  
+            sd = client_socket[i];   
+                 
+            //if valid socket descriptor then add to read list  
+            if(sd > 0)   
+                FD_SET( sd , &readfds);   
+                 
+            //highest file descriptor number, need it for the select function  
+            if(sd > max_sd)   
+                max_sd = sd;   
+        }
+
+        //wait for an activity on one of the sockets , timeout is NULL ,  
+        //so wait indefinitely  
+        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
+       
+        if ((activity < 0) && (errno!=EINTR))   
+        {   
+            perror("select error");  exit(EXIT_FAILURE);  
+        }  
+        //If something happened on the server socket ,  
+        //then its an incoming connection  
+        if (FD_ISSET(server_fd, &readfds)){
+
+    		if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address,(socklen_t*)&addrlen))<0) { 
+				perror("accept"); exit(EXIT_FAILURE); 
+			} 
+			recv( new_socket , buffer, 1024,0); 
+			if(strlen(buffer)> 100 )
+				continue;
+
+			//create the message
+			server_worker_msg msg;
+			strcpy(msg.cmd,buffer);
+			msg.sd = new_socket;
+			memcpy(&msg.receiver_addr,&client_address,sizeof(client_address));
 		
-		//declare character buffer (byte array)
-		char buffer_msg[msg_size];
+			//declare character buffer (byte array)
+			char buffer_msg[msg_size];
 	 	
-	 	//serialize the struct
-  		memcpy(buffer_msg,&msg,msg_size);
+	 		//serialize the struct
+  			memcpy(buffer_msg,&msg,msg_size);
   		
-  		//write in pipe the serialized struct
-		write(pipe_fds[1],buffer_msg,msg_size);
+  			//write in pipe the serialized struct
+			write(pipe_fds[1],buffer_msg,msg_size);
 
+			//add the new socket
+			for (int i = 0; i < max_clients; i++) {
+				 if( client_socket[i] == 0 ){
+				 	client_socket[i] = new_socket;
+				 	break;
+				 }
+			}
+        }
+
+        //remove the closed sockets from the set
+        for (int i = 0; i < max_clients; i++) {
+        	sd = client_socket[i]; 
+
+        	if (sd!=0 && !FD_ISSET( sd , &readfds)){
+        		client_socket[i] = 0; 
+        		//printf("hiii\n" );
+        	}
+        	
+        }
 
 
 	}
@@ -250,6 +318,8 @@ void child_function(int this,int msg_size){
 		}
 		/*task finished!*/
 		working= 0;
+		//close the served socket and remove it from the array
+		close(msg.sd);
 	}
 	
 	

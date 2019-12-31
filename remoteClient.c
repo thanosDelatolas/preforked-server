@@ -25,8 +25,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	int childpid;
-
-	if((childpid=fork()<0)){
+	/*if((childpid=fork()<0)){
 		perror("fork call");
 		exit(EXIT_FAILURE);
 	}
@@ -40,31 +39,49 @@ int main(int argc, char *argv[])
 	else {
 
 		receive_commands_result(receivePort);
-	}
+	}*/
+	send_commands(serverName,serverPort,filename);
 }
 
 void send_commands(char* serverName,int serverPort,char* filename){
 	int sent_commands=0;
+
 	FILE* fp;
     char * command = NULL;
     size_t len = 0;
     ssize_t read;
 
+    struct sockaddr_in servaddr;
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+    servaddr.sin_port = htons(serverPort); 
+
+
+
     int sockfd;
- 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket call"); exit(EXIT_FAILURE);
-   	}
 
     fp = fopen(filename, "r");
 	while(1){
 
-		/*end of file*/
+		if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+       		perror("socket call"); exit(EXIT_FAILURE);
+   		}
+
+	   	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) { 
+	        	perror("connection with the server failed...\n"); 
+	        	exit(EXIT_FAILURE); 
+		} 
+    	//connected
 		if ((read = getline(&command, &len, fp)) == -1){
+			/*end of file*/
 			fclose(fp);
 			break;
 
 		}
 
+		send(sockfd, command, 1024,0); 
+		sent_commands++;
 		if(sent_commands == 9){
 			sent_commands = 0;
 			sleep(5);

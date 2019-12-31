@@ -26,9 +26,9 @@ char* server_commands[7]={
 	"timeToStop"
 
 };
-
 typedef struct server_worker_message{
 	char cmd[1024];
+	int sd; //socket descriptor
 	struct sockaddr_in receiver_addr;
 	
 }server_worker_msg;
