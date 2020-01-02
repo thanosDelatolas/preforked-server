@@ -1,4 +1,3 @@
-// Client side C/C++ program to demonstrate Socket programming 
 #include <stdio.h> 
 #include <sys/socket.h> 
 #include <arpa/inet.h> 
@@ -26,22 +25,20 @@ int main(int argc, char *argv[])
 		printf("Can't find file %s\n",filename );
 		exit(EXIT_FAILURE);
 	}
-	int childpid;
-	if((childpid=fork()<0)){
-		perror("fork call");
-		exit(EXIT_FAILURE);
-	}
-	//parent
-	if(childpid>0){
+	pid_t pid =fork();
 
-		send_commands(serverName,serverPort,filename);
-
+	if(pid <0 ){
+		perror("Can't create process"); exit(EXIT_FAILURE);
 	}
-	//child 
+	/*child*/
+	else if(pid == 0){
+		
+	}
+	/*parent*/
 	else {
-
-		receive_commands_result(receivePort);
+		send_commands(serverName,serverPort,filename);
 	}
+
 }
 
 void send_commands(char* serverName,int serverPort,char* filename){
@@ -90,9 +87,32 @@ void send_commands(char* serverName,int serverPort,char* filename){
 	}
 }
 void receive_commands_result(int receivePort){
+	int sockfd; 
+
+    char buffer[512];// receive up to 512 bytes
+
+    struct sockaddr_in servaddr, cliaddr;
+
+    // Creating socket file descriptor 
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+        perror("socket creation failed"); exit(EXIT_FAILURE); 
+    } 
+
+    memset(&servaddr, 0, sizeof(servaddr)); 
+    memset(&cliaddr, 0, sizeof(cliaddr)); 
+
+    // Filling server information 
+    servaddr.sin_family    = AF_INET; // IPv4 
+    servaddr.sin_addr.s_addr = INADDR_ANY; 
+    servaddr.sin_port = htons(receivePort); 
+
+    // Bind the socket with the server address 
+    if ( bind(sockfd, (struct sockaddr *)&servaddr,sizeof(servaddr)) < 0 ){ 
+        perror("bind failed"); exit(EXIT_FAILURE); 
+    } 
 
 	while(1){
-		break;
+		
 	}
 
 }

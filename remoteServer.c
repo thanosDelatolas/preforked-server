@@ -16,9 +16,6 @@
 
 int portNumber,numChildren;
 
-int client_socket[max_clients];
-
-
 
 int main(int argc,char *argv[]){
 
@@ -212,9 +209,6 @@ void server_function(int msg_size){
   				//write in pipe the serialized struct
 				write(pipe_fds[1],buffer_msg,msg_size);
 
-
-
-
 			}
 		}
 
@@ -313,15 +307,16 @@ void child_function(int this,int msg_size){
 			}
 			//command is executed
 			else{
-				char path[1035];
+
+				char * command_result = NULL;
+    			size_t len = 0;
+				
 				/* Read the output a line at a time - output it. */
-  				while (fgets(path, sizeof(path), fp) != NULL) {
-    				printf("%s\n", path);
+  				while (getline(&command_result, &len, fp)!=-1){
+  					printf("%s\n",command_result );
   				}
-
-			  /* close */
-			  pclose(fp);
-
+			  	/* close */
+			 	pclose(fp);
 
 			}
 
