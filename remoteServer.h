@@ -27,8 +27,7 @@ char* server_commands[7]={
 
 };
 typedef struct server_worker_message{
-	char cmd[1024];
-	int sd; //socket descriptor
+	char cmd[100];
 	struct sockaddr_in receiver_addr;
 	
 }server_worker_msg;
