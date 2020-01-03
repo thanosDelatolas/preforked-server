@@ -4,7 +4,6 @@
 #include <unistd.h> 
 #include <string.h>  
 #include <stdlib.h>
-#include <string.h>
 
 
 
@@ -32,7 +31,7 @@ int main(int argc, char *argv[])
 	}
 	/*child*/
 	else if(pid == 0){
-		
+		receive_commands_result(receivePort);
 	}
 	/*parent*/
 	else {
@@ -54,7 +53,6 @@ void send_commands(char* serverName,int serverPort,char* filename){
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
     servaddr.sin_port = htons(serverPort); 
-
 
 
     int sockfd;
@@ -101,6 +99,14 @@ void receive_commands_result(int receivePort){
     memset(&servaddr, 0, sizeof(servaddr)); 
     memset(&cliaddr, 0, sizeof(cliaddr)); 
 
+    /* to set the socket options- to reuse the given port multiple times */
+	int reuse=1;
+	
+
+	if(setsockopt(sockfd,SOL_SOCKET,SO_REUSEPORT,(const char*)&reuse,sizeof(reuse))<0){
+		perror("setsockopt(SO_REUSEPORT) failed\n"); exit(EXIT_FAILURE);
+	}
+
     // Filling server information 
     servaddr.sin_family    = AF_INET; // IPv4 
     servaddr.sin_addr.s_addr = INADDR_ANY; 
@@ -111,8 +117,14 @@ void receive_commands_result(int receivePort){
         perror("bind failed"); exit(EXIT_FAILURE); 
     } 
 
+    int len = sizeof(cliaddr);
+    int n;
 	while(1){
-		
+		n = recvfrom(sockfd,buffer, 512,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
+		if(n<0)
+			break;
+		buffer[n] = '\0'; 
+	 	printf("%s\n", buffer);
 	}
 
 }

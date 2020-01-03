@@ -16,6 +16,13 @@
 
 int portNumber,numChildren;
 
+typedef struct server_worker_message{
+	char cmd[100];
+	int port;
+	char ip[INET_ADDRSTRLEN];
+	
+}server_worker_msg;
+
 
 int main(int argc,char *argv[]){
 
@@ -196,10 +203,23 @@ void server_function(int msg_size){
 					continue;
 				}
 
+
 				//create the message
 				server_worker_msg msg;
 				strcpy(msg.cmd,buffer);
-				memcpy(&msg.receiver_addr,&client_address,sizeof(client_address));
+
+				//get the ip as a string and port as int
+				
+				getpeername(connectlist[i], (struct sockaddr *)&client_address,(socklen_t*)&addrlen);
+				msg.port=ntohs(client_address.sin_port);
+
+				struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&client_address;
+				struct in_addr ipAddr = pV4Addr->sin_addr;
+
+				inet_ntop( AF_INET, &ipAddr, msg.ip, INET_ADDRSTRLEN );
+
+				//...
+
 				//declare character buffer (byte array)
 				char buffer_msg[msg_size];
 	 	
@@ -211,18 +231,9 @@ void server_function(int msg_size){
 
 			}
 		}
-
-
-
-
 	}
 }
         	
-        
-
-    
-
-
 
 void signal_handler(int signum){ 
 	switch(signum){
@@ -237,6 +248,14 @@ void child_function(int this,int msg_size){
 	char task[msg_size]; 
 	int valdread,length;
 	int working = 0;
+
+	//socket to send the command's result
+	int sockfd;
+			  	
+  	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+
+  		perror("socket creation failed"); exit(EXIT_FAILURE); 
+  	}
 
 	while(1){
 		
@@ -265,7 +284,7 @@ void child_function(int this,int msg_size){
 		char buffer [1024]={0};
 		strcpy(buffer,msg.cmd);
 
-
+		
 		trim(buffer);
 		length = strlen(buffer);
 		
@@ -308,15 +327,27 @@ void child_function(int this,int msg_size){
 			//command is executed
 			else{
 
+			  	struct sockaddr_in servaddr;
+
+			  	memset(&servaddr, 0, sizeof(servaddr)); 
+      
+			    // Filling server information 
+			    servaddr.sin_family = AF_INET; 
+			   	servaddr.sin_addr.s_addr = INADDR_ANY;
+    			servaddr.sin_port = htons(4000); 
+
+
 				char * command_result = NULL;
     			size_t len = 0;
 				
 				/* Read the output a line at a time - output it. */
   				while (getline(&command_result, &len, fp)!=-1){
-  					printf("%s\n",command_result );
+  					sendto(sockfd, command_result, len, MSG_CONFIRM, 
+  						(struct sockaddr *) &servaddr,sizeof(servaddr));
   				}
 			  	/* close */
 			 	pclose(fp);
+
 
 			}
 
