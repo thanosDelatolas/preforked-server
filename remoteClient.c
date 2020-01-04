@@ -5,11 +5,19 @@
 #include <string.h>  
 #include <stdlib.h>
 
+typedef struct 
+{
+	char command_name[100];
+	int answered; //for 2 or more same commands
+}command_struct;
 
-
-void send_commands(char* serverName,int serverPort,char* filename);
-void receive_commands_result(int receivePort);
+command_struct** create_commands_array(char* filename,int* n);
+void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
 void send_receive_port(int receivePort, int serverPort);
+
+
+char ** commands = NULL;
 
 int main(int argc, char *argv[]) 
 { 	
@@ -25,7 +33,13 @@ int main(int argc, char *argv[])
 		printf("Can't find file %s\n",filename );
 		exit(EXIT_FAILURE);
 	}
+	
+	int num_of_commands=-1;
+
+	command_struct** commands_array=create_commands_array(filename,&num_of_commands);
+
 	send_receive_port(receivePort,serverPort);
+
 	pid_t pid =fork();
 
 	if(pid <0 ){
@@ -33,11 +47,11 @@ int main(int argc, char *argv[])
 	}
 	/*child*/
 	else if(pid == 0){
-		receive_commands_result(receivePort);
+		receive_commands_result(receivePort,commands_array,num_of_commands);
 	}
 	/*parent*/
 	else {
-		send_commands(serverName,serverPort,filename);
+		send_commands(serverName,serverPort,commands_array , num_of_commands);
 	}
 
 }
@@ -66,13 +80,9 @@ void send_receive_port(int receivePort, int serverPort){
 	write(sockfd, port_message, 1024);
 	close(sockfd);
 }
-void send_commands(char* serverName,int serverPort,char* filename){
+void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands){
 	int sent_commands=0;
 
-	FILE* fp;
-    char * command = NULL;
-    size_t len = 0;
-    ssize_t read;
 
     struct sockaddr_in servaddr;
 
@@ -92,26 +102,21 @@ void send_commands(char* serverName,int serverPort,char* filename){
 	} 
 	
 
-    fp = fopen(filename, "r");
-	while(1){
+   	int i=0;
+	while(i<num_of_commands){
 
 		//connected
-		if ((read = getline(&command, &len, fp)) == -1){
-			/*end of file*/
-			fclose(fp);
-			break;
-
-		}
-		write(sockfd, command, 1024); 
+		write(sockfd, commands_array[i] -> command_name, 1024); 
 		sent_commands++;
 		if(sent_commands == 9){
 			sent_commands = 0;
 			sleep(5);
 		}
+		i++;
 
 	}
 }
-void receive_commands_result(int receivePort){
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
 	int sockfd; 
 
     char buffer[512];// receive up to 512 bytes
@@ -154,4 +159,44 @@ void receive_commands_result(int receivePort){
 	 	printf("%s\n", buffer);
 	}
 
+}
+
+/*
+ create commands array
+*/
+
+command_struct** create_commands_array(char* filename,int* n){
+	FILE* fp;
+    char * command = NULL;
+    size_t len = 0;
+    ssize_t read;
+    command_struct** commands_array = NULL;
+
+    int num_of_commands=0;
+
+    fp = fopen(filename, "r");
+    while(1){
+
+    	if ((read = getline(&command, &len, fp)) == -1){
+    		
+			/*end of file*/
+			fclose(fp);
+			break;
+
+		}
+		if(strlen(command) > 100 ){
+			strcpy(command,"invalid");
+		}
+
+		commands_array = (command_struct**)realloc (commands_array, sizeof (command_struct*) * (num_of_commands+1));
+		commands_array[num_of_commands] = (command_struct*)malloc(sizeof(command_struct));
+
+		commands_array[num_of_commands] -> answered = 0;
+		strcpy(commands_array[num_of_commands] -> command_name,command);
+		num_of_commands ++;
+
+
+    }
+    *n = num_of_commands;
+    return commands_array;
 }

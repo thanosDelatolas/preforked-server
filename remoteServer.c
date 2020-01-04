@@ -34,16 +34,13 @@ int portNumber,numChildren;
 
 typedef struct{
 	char cmd[100];
-	int port;
-	
+	int port;	
 	
 }server_worker_msg;
 
 typedef struct{
 	char cmd_result[512];
 	int last;
-	
-	
 }udp_msg;
 
 int pipe_fds[2];
