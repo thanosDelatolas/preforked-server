@@ -362,6 +362,7 @@ void child_function(int this,int msg_size){
 			}
 			//command is executed
 			else{
+				printf("%s\n", final_command );
 
 			  	struct sockaddr_in servaddr;
 
@@ -377,20 +378,19 @@ void child_function(int this,int msg_size){
 				int c;
 				int n=0;
 
-				while (1)
-    			{	
+				while (1){	
     				//last packet
     				if((c = fgetc(fp)) == EOF){
     					sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
   						(struct sockaddr *) &servaddr,sizeof(servaddr));
   						break;
     				}
-    				
         			command_result[n++] = (char) c;
-        			if(strlen(command_result) == 512 ){
+        			if(n == 511 ){
+        				command_result[512] ='\0';
         				sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
   						(struct sockaddr *) &servaddr,sizeof(servaddr));
-
+        				n = 0;
   						for (int i = 0; i < 512; ++i){
   							command_result[i] = 0;
   						}
