@@ -7,22 +7,49 @@
 #include <netinet/in.h> /* for sockaddr_in */
 #include <arpa/inet.h> /* for hton * */
 #include <signal.h> 
-#include "remoteServer.h"
 #include <sys/wait.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO
 
 
 #define max_clients 20 
 
+//Functions...
+
+void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret);
+void server_function(int msg_size);
+void child_function(int this,int msg_size);
+void signal_handler(int signum);
+void trim(char * str);
+char** create_commnads_array(char* command,int length,int* commands_number);
+int count_occurances(char* string,int length,char ch);
+int valid_command(char* command);
+FILE* execute(char* command);
+
+//...
+
+//gloabl variables
+
 int portNumber,numChildren;
 
-typedef struct server_worker_message{
+typedef struct{
 	char cmd[100];
 	int port;
-	char ip[INET_ADDRSTRLEN];
+	
 	
 }server_worker_msg;
 
+int pipe_fds[2];
+char* server_commands[7]={
+	"ls",
+	"cat",
+	"cut",
+	"grep",
+	"tr",
+	"end",
+	"timeToStop"
+
+};
+//...
 
 int main(int argc,char *argv[]){
 
@@ -35,8 +62,6 @@ int main(int argc,char *argv[]){
 	numChildren = atoi(argv[2]);
 
 	if(numChildren < 1){ perror("At least one child is required"); exit(EXIT_FAILURE); }
-
-	parent = getpid();
 
 	//signals handlers....
 	signal(SIGPIPE,signal_handler);
@@ -133,6 +158,8 @@ void server_function(int msg_size){
 
     create_TCP_SOCKET(&server_fd, &server_address);
 
+    int receivePort=-1;
+
     int connectlist[max_clients];  /* Array of connected sockets so we know who we are talking to */
 	fd_set socks;        /* Socket file descriptors we want to wake up for, using select() */
 	int highsock;	     /* Highest  file descriptor, needed for select() */
@@ -145,6 +172,7 @@ void server_function(int msg_size){
     	connectlist[i]=0;
     }
 
+    
   	/*main server loop runs forever*/
 	while(1){
 		//clear the set
@@ -203,23 +231,22 @@ void server_function(int msg_size){
 					continue;
 				}
 
+			 	//get the receivePort from client
+    			char *ptr = strtok(buffer, ":");
+				if(strcmp(buffer,"receivePort")==0){
+					ptr = strtok(NULL, ":");
+					receivePort=atoi(ptr);
+					continue;
+				}
+	
 
 				//create the message
 				server_worker_msg msg;
+
+				//copy the command
 				strcpy(msg.cmd,buffer);
 
-				//get the ip as a string and port as int
-				
-				getpeername(connectlist[i], (struct sockaddr *)&client_address,(socklen_t*)&addrlen);
-				msg.port=ntohs(client_address.sin_port);
-
-				struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&client_address;
-				struct in_addr ipAddr = pV4Addr->sin_addr;
-
-				inet_ntop( AF_INET, &ipAddr, msg.ip, INET_ADDRSTRLEN );
-
-				//...
-
+				msg.port = receivePort;
 				//declare character buffer (byte array)
 				char buffer_msg[msg_size];
 	 	
@@ -285,6 +312,7 @@ void child_function(int this,int msg_size){
 		strcpy(buffer,msg.cmd);
 
 		
+		
 		trim(buffer);
 		length = strlen(buffer);
 		
@@ -334,7 +362,7 @@ void child_function(int this,int msg_size){
 			    // Filling server information 
 			    servaddr.sin_family = AF_INET; 
 			   	servaddr.sin_addr.s_addr = INADDR_ANY;
-    			servaddr.sin_port = htons(4000); 
+    			servaddr.sin_port = htons(msg.port); 
 
 
 				char * command_result = NULL;
@@ -348,7 +376,6 @@ void child_function(int this,int msg_size){
 			  	/* close */
 			 	pclose(fp);
 
-
 			}
 
 		}
@@ -359,6 +386,7 @@ void child_function(int this,int msg_size){
 	
 	
 }
+
 
 
 

@@ -9,6 +9,7 @@
 
 void send_commands(char* serverName,int serverPort,char* filename);
 void receive_commands_result(int receivePort);
+void send_receive_port(int receivePort, int serverPort);
 
 int main(int argc, char *argv[]) 
 { 	
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
 		printf("Can't find file %s\n",filename );
 		exit(EXIT_FAILURE);
 	}
+	send_receive_port(receivePort,serverPort);
 	pid_t pid =fork();
 
 	if(pid <0 ){
@@ -39,7 +41,31 @@ int main(int argc, char *argv[])
 	}
 
 }
+void send_receive_port(int receivePort, int serverPort){
 
+	struct sockaddr_in servaddr;
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+    servaddr.sin_port = htons(serverPort); 
+
+
+    int sockfd;
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+   		perror("socket call"); exit(EXIT_FAILURE);
+	}
+
+   	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) { 
+    	perror("connection with the server failed...\n"); 
+    	exit(EXIT_FAILURE); 
+	} 
+
+	//send receivePort to the server
+	char port_message[1024] = {0};
+	snprintf(port_message, 1024, "receivePort:%d", receivePort); 
+	write(sockfd, port_message, 1024);
+	close(sockfd);
+}
 void send_commands(char* serverName,int serverPort,char* filename){
 	int sent_commands=0;
 
@@ -64,11 +90,12 @@ void send_commands(char* serverName,int serverPort,char* filename){
     	perror("connection with the server failed...\n"); 
     	exit(EXIT_FAILURE); 
 	} 
+	
 
     fp = fopen(filename, "r");
 	while(1){
 
-    	//connected
+		//connected
 		if ((read = getline(&command, &len, fp)) == -1){
 			/*end of file*/
 			fclose(fp);
@@ -121,7 +148,7 @@ void receive_commands_result(int receivePort){
     int n;
 	while(1){
 		n = recvfrom(sockfd,buffer, 512,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
-		if(n<0)
+		if(n<=0)
 			break;
 		buffer[n] = '\0'; 
 	 	printf("%s\n", buffer);

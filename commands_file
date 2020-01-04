@@ -1,0 +1,2 @@
+cat greekfile | tr “[a-z]” “[A-Z]”
+ls | tr “[a-z]” “[A-Z]”
