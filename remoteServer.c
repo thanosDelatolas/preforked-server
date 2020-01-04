@@ -25,6 +25,7 @@ int count_occurances(char* string,int length,char ch);
 int valid_command(char* command);
 FILE* execute(char* command);
 
+
 //...
 
 //gloabl variables
@@ -37,6 +38,13 @@ typedef struct{
 	
 	
 }server_worker_msg;
+
+typedef struct{
+	char cmd_result[512];
+	int last;
+	
+	
+}udp_msg;
 
 int pipe_fds[2];
 char* server_commands[7]={
@@ -365,14 +373,31 @@ void child_function(int this,int msg_size){
     			servaddr.sin_port = htons(msg.port); 
 
 
-				char * command_result = NULL;
-    			size_t len = 0;
-				
-				/* Read the output a line at a time - output it. */
-  				while (getline(&command_result, &len, fp)!=-1){
-  					sendto(sockfd, command_result, len, MSG_CONFIRM, 
+				char command_result[512] = {0};
+				int c;
+				int n=0;
+
+				while (1)
+    			{	
+    				//last packet
+    				if((c = fgetc(fp)) == EOF){
+    					sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
   						(struct sockaddr *) &servaddr,sizeof(servaddr));
-  				}
+  						break;
+    				}
+    				
+        			command_result[n++] = (char) c;
+        			if(strlen(command_result) == 512 ){
+        				sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
+  						(struct sockaddr *) &servaddr,sizeof(servaddr));
+
+  						for (int i = 0; i < 512; ++i){
+  							command_result[i] = 0;
+  						}
+        			}
+    			}
+    			
+				
 			  	/* close */
 			 	pclose(fp);
 
@@ -456,6 +481,9 @@ FILE* execute(char* command){
     
 
 }
+
+/*function to get size of the file.*/
+
 /**
  * Remove leading and trailing white space characters
  */
@@ -500,3 +528,5 @@ void trim(char * str)
     /* Mark the next character to last non white space character as NULL */
     str[index + 1] = '\0';
 }
+
+
