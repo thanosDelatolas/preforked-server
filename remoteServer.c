@@ -284,6 +284,7 @@ void child_function(int this,int msg_size){
 	int valdread,length;
 	int working = 0;
 
+	char invalid_command[8] = "invalid";
 	//socket to send the command's result
 	int sockfd;
 			  	
@@ -340,11 +341,24 @@ void child_function(int this,int msg_size){
 			i++;
 
 		}
+		//address to send the command's result
+		struct sockaddr_in servaddr;
+
+	  	memset(&servaddr, 0, sizeof(servaddr)); 
+      
+	    // Filling server information 
+	    servaddr.sin_family = AF_INET; 
+	   	servaddr.sin_addr.s_addr = INADDR_ANY;
+		servaddr.sin_port = htons(msg.port);
+		//...
+
 		//invalid name 
 		if(!valid){
-			printf("Invalid command %s\n", command_name);
+			sendto(sockfd, invalid_command, strlen(invalid_command), MSG_CONFIRM, 
+  						(struct sockaddr *) &servaddr,sizeof(servaddr));
 		}
 		else{
+
 			//concatenate the commands 
 			char final_command[100];
 			strcpy(final_command,pipelined_commands[0]);
@@ -358,21 +372,12 @@ void child_function(int this,int msg_size){
 
 			//command can't be executed because of arguments
 			if(fp == NULL){
+				sendto(sockfd, invalid_command, strlen(invalid_command), MSG_CONFIRM, 
+  						(struct sockaddr *) &servaddr,sizeof(servaddr));
 
 			}
 			//command is executed
 			else{
-				printf("%s\n", final_command );
-
-			  	struct sockaddr_in servaddr;
-
-			  	memset(&servaddr, 0, sizeof(servaddr)); 
-      
-			    // Filling server information 
-			    servaddr.sin_family = AF_INET; 
-			   	servaddr.sin_addr.s_addr = INADDR_ANY;
-    			servaddr.sin_port = htons(msg.port); 
-
 
 				char command_result[512] = {0};
 				int c;
@@ -381,6 +386,7 @@ void child_function(int this,int msg_size){
 				while (1){	
     				//last packet
     				if((c = fgetc(fp)) == EOF){
+    					command_result[n+1] = '\0';
     					sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
   						(struct sockaddr *) &servaddr,sizeof(servaddr));
   						break;
