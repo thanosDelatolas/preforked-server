@@ -166,14 +166,17 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
     int len = sizeof(cliaddr);
     int n;
-    int received_commands;
+    int received_commands=0;
 
     char cmd_res[UPD_CMD_SIZE]={0};
-    
+
+    FILE* fp = NULL;
+    char filePath[20] = {0};
+
+    int new_cmd=1;
 	while(1){
 		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
-		if(n<=0)
-			break;
+		
 		udp_msg msg;
 		buffer[n] = '\0';
 		//desirialize and create the struct
@@ -181,14 +184,26 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
 		strcpy(cmd_res,msg.command_result);
 
+		if(new_cmd == 1){
+			//create the name of the file
+			snprintf(filePath, 20, "output.%d.%d", receivePort,(msg.command_num+1)); 
+			fp = fopen(filePath, "a");
+			new_cmd = 0;
+		}
+
 		if(msg.last == 1) {
-			printf("last packet of %d\n%s\n",msg.command_num,cmd_res );
+			fputs(cmd_res, fp);
 			received_commands++;
+			fclose(fp);
+			new_cmd =1;
 
 		}
 		else{
-			printf("%s\n", cmd_res);
+			fputs(cmd_res, fp);
 		}
+
+		if(received_commands == num_of_commands)
+			break;
 
 
 	 	
