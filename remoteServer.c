@@ -261,6 +261,8 @@ void server_function(int msg_size){
 					receivePort=atoi(ptr);
 					continue;
 				}
+				if(strlen(buffer) > 100)
+					continue;
 	
 				connection_list[i].command_code ++;
 
@@ -302,7 +304,7 @@ void child_function(int this,int msg_size){
 	int valdread,length;
 	int working = 0;
 
-	char invalid_command[8] = "invalid";
+	char invalid_command[8] = "";
 	//socket to send the command's result
 	int sockfd;
 			  	
