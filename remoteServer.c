@@ -12,6 +12,8 @@
 
 
 #define max_clients 20 
+#define PACKET_SIZE 512
+#define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
 
 //Functions...
 
@@ -24,6 +26,7 @@ char** create_commnads_array(char* command,int length,int* commands_number);
 int count_occurances(char* string,int length,char ch);
 int valid_command(char* command);
 FILE* execute(char* command);
+char* create_udp_packet(char* command_result,int last,int command_code);
 
 
 //...
@@ -32,16 +35,28 @@ FILE* execute(char* command);
 
 int portNumber,numChildren;
 
+
 typedef struct{
 	char cmd[100];
-	int port;	
+	int port;
+	int command_code;	
 	
 }server_worker_msg;
 
 typedef struct{
-	char cmd_result[512];
+	int command_num;
 	int last;
+	char command_result[UPD_CMD_SIZE];
 }udp_msg;
+
+typedef struct {
+  int socket;
+  int command_code;
+} connectlist_node;
+
+/* Array of connected sockets so we know who we are talking to */
+connectlist_node connection_list[max_clients];
+
 
 int pipe_fds[2];
 char* server_commands[7]={
@@ -165,7 +180,6 @@ void server_function(int msg_size){
 
     int receivePort=-1;
 
-    int connectlist[max_clients];  /* Array of connected sockets so we know who we are talking to */
 	fd_set socks;        /* Socket file descriptors we want to wake up for, using select() */
 	int highsock;	     /* Highest  file descriptor, needed for select() */
 
@@ -174,7 +188,8 @@ void server_function(int msg_size){
     int valread;
 	//initialize all fds to 0
     for (int i = 0; i < max_clients; i++){
-    	connectlist[i]=0;
+    	connection_list[i].socket = 0;
+    	connection_list[i].command_code = -1;
     }
 
     
@@ -190,10 +205,11 @@ void server_function(int msg_size){
 		/* Loops through all the possible connections and adds those sockets to the fd_set */
 
 		for (int i = 0; i < max_clients; i++){
-			if(connectlist[i]!=0)
-				FD_SET(connectlist[i],&socks);
-			if(connectlist[i] > highsock)
-				highsock = connectlist[i];
+
+			if(connection_list[i].socket!=0)
+				FD_SET(connection_list[i].socket,&socks);
+			if(connection_list[i].socket > highsock)
+				highsock = connection_list[i].socket;
 		}
 
 		/* select() returns the number of sockets that are readable */
@@ -218,8 +234,8 @@ void server_function(int msg_size){
 			}
 
 			for (int i = 0; i < max_clients; i++){
-			 	if(connectlist[i] == 0 ){
-			 		connectlist[i] = new_socket;
+			 	if(connection_list[i].socket == 0 ){
+			 		connection_list[i].socket = new_socket;
 			 		break;
 			 	}
 		 	} 
@@ -228,11 +244,13 @@ void server_function(int msg_size){
 		/* Now check connectlist for available data */
 
 		for (int i = 0; i < max_clients; i++){
-			if (FD_ISSET(connectlist[i],&socks)){
-				valread=read( connectlist[i] , buffer, 1024);
+
+			if (FD_ISSET(connection_list[i].socket,&socks)){
+				valread=read( connection_list[i].socket , buffer, 1024);
 				if (valread <= 0){
-					close(connectlist[i]);
-					connectlist[i] = 0;
+					close(connection_list[i].socket);
+					connection_list[i].socket = 0;
+					connection_list[i].command_code = -1;
 					continue;
 				}
 
@@ -244,6 +262,7 @@ void server_function(int msg_size){
 					continue;
 				}
 	
+				connection_list[i].command_code ++;
 
 				//create the message
 				server_worker_msg msg;
@@ -252,6 +271,8 @@ void server_function(int msg_size){
 				strcpy(msg.cmd,buffer);
 
 				msg.port = receivePort;
+
+				msg.command_code = connection_list[i].command_code;
 				//declare character buffer (byte array)
 				char buffer_msg[msg_size];
 	 	
@@ -265,7 +286,7 @@ void server_function(int msg_size){
 		}
 	}
 }
-        	
+	
 
 void signal_handler(int signum){ 
 	switch(signum){
@@ -348,11 +369,14 @@ void child_function(int this,int msg_size){
 	   	servaddr.sin_addr.s_addr = INADDR_ANY;
 		servaddr.sin_port = htons(msg.port);
 		//...
+		char* udp_buf;
 
 		//invalid name 
 		if(!valid){
-			sendto(sockfd, invalid_command, strlen(invalid_command), MSG_CONFIRM, 
-  						(struct sockaddr *) &servaddr,sizeof(servaddr));
+			udp_buf = create_udp_packet(invalid_command,1,msg.command_code);
+
+			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
+						(struct sockaddr *) &servaddr,sizeof(servaddr));
 		}
 		else{
 
@@ -366,33 +390,47 @@ void child_function(int this,int msg_size){
 
 			//execute the command 
 			FILE* fp = execute(final_command);
+			
 
 			//command can't be executed because of arguments
 			if(fp == NULL){
-				sendto(sockfd, invalid_command, strlen(invalid_command), MSG_CONFIRM, 
-  						(struct sockaddr *) &servaddr,sizeof(servaddr));
+				udp_buf = create_udp_packet(invalid_command,1,msg.command_code);
+
+				sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
+						(struct sockaddr *) &servaddr,sizeof(servaddr));
 
 			}
 			//command is executed
 			else{
 
-				char command_result[512] = {0};
+				char command_result[UPD_CMD_SIZE] = {0};
 				int c;
 				int n=0;
+				
 
 				while (1){	
     				//last packet
     				if((c = fgetc(fp)) == EOF){
     					command_result[n+1] = '\0';
-    					sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
-  						(struct sockaddr *) &servaddr,sizeof(servaddr));
+
+    					//send the sruct
+    					udp_buf = create_udp_packet(command_result,1,msg.command_code);
+
+    					sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
+								(struct sockaddr *) &servaddr,sizeof(servaddr));
   						break;
     				}
         			command_result[n++] = (char) c;
-        			if(n == 511 ){
-        				command_result[512] ='\0';
-        				sendto(sockfd, command_result, strlen(command_result), MSG_CONFIRM, 
-  						(struct sockaddr *) &servaddr,sizeof(servaddr));
+
+        			if(n == UPD_CMD_SIZE-1 ){
+        				command_result[n+1] ='\0';
+
+        				//send the struct
+        				udp_buf = create_udp_packet(command_result,0,msg.command_code);
+
+        				sendto(sockfd, udp_buf, PACKET_SIZE, MSG_CONFIRM, 
+  								(struct sockaddr *) &servaddr,sizeof(servaddr));
+
         				n = 0;
   						for (int i = 0; i < 512; ++i){
   							command_result[i] = 0;
@@ -416,6 +454,21 @@ void child_function(int this,int msg_size){
 }
 
 
+char* create_udp_packet(char* command_result,int last,int command_code){
+	udp_msg msg;
+
+	strcpy(msg.command_result,command_result);
+	msg.last = last;
+	msg.command_num = command_code;
+
+	//declare character buffer (byte array)
+	static char buffer_msg[PACKET_SIZE];
+	 	
+	//serialize the struct
+	memcpy(buffer_msg,&msg,PACKET_SIZE);
+
+	return buffer_msg;
+}
 
 
 /*

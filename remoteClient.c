@@ -5,16 +5,30 @@
 #include <string.h>  
 #include <stdlib.h>
 
+#define PACKET_SIZE 512
+#define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
+
+
 typedef struct 
 {
 	char command_name[100];
 	int answered; //for 2 or more same commands
 }command_struct;
 
-command_struct** create_commands_array(char* filename,int* n);
+typedef struct{
+	int command_num;
+	int last;
+	char command_result[UPD_CMD_SIZE];
+}udp_msg;
+
+
+
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);
 void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
 void send_receive_port(int receivePort, int serverPort);
+
+command_struct** create_commands_array(char* filename,int* n);
+
 
 
 char ** commands = NULL;
@@ -79,6 +93,7 @@ void send_receive_port(int receivePort, int serverPort){
 	snprintf(port_message, 1024, "receivePort:%d", receivePort); 
 	write(sockfd, port_message, 1024);
 	close(sockfd);
+
 }
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands){
 	int sent_commands=0;
@@ -119,7 +134,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
 	int sockfd; 
 
-    char buffer[512];// receive up to 512 bytes
+    char buffer[PACKET_SIZE]; // receive up to 512 bytes
 
     struct sockaddr_in servaddr, cliaddr;
 
@@ -151,15 +166,36 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
     int len = sizeof(cliaddr);
     int n;
+    int received_commands;
+
+    char cmd_res[UPD_CMD_SIZE]={0};
+    
 	while(1){
-		n = recvfrom(sockfd,buffer, 512,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
+		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
 		if(n<=0)
 			break;
-		buffer[n] = '\0'; 
-	 	printf("%s\n", buffer);
+		udp_msg msg;
+		buffer[n] = '\0';
+		//desirialize and create the struct
+		memcpy(&msg ,buffer, PACKET_SIZE);
+
+		strcpy(cmd_res,msg.command_result);
+
+		if(msg.last == 1) {
+			printf("last packet of %d\n%s\n",msg.command_num,cmd_res );
+			received_commands++;
+
+		}
+		else{
+			printf("%s\n", cmd_res);
+		}
+
+
+	 	
 	}
 
 }
+
 
 /*
  create commands array
