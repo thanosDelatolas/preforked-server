@@ -27,7 +27,7 @@ int count_occurances(char* string,int length,char ch);
 int valid_command(char* command);
 FILE* execute(char* command);
 char* create_udp_packet(char* command_result,int last,int command_code);
-
+void close_reading_sockets();
 
 //...
 
@@ -85,6 +85,8 @@ int main(int argc,char *argv[]){
 
 	//signals handlers....
 	signal(SIGPIPE,signal_handler);
+	signal(SIGUSR1,signal_handler);//command end
+	signal(SIGUSR2,signal_handler);//command timeToStop
 	//...
 
     //create pipe...
@@ -294,6 +296,11 @@ void signal_handler(int signum){
 	switch(signum){
 		case SIGPIPE:
 			break; //do nothing
+		case SIGUSR1:
+			close_reading_sockets();
+			break;
+		case SIGUSR2:
+			break;
 	}
 }
 
@@ -344,7 +351,12 @@ void child_function(int this,int msg_size){
 		
 		trim(buffer);
 		length = strlen(buffer);
-		
+
+		if(strcmp(buffer,"end")==0){
+			kill(getppid(),SIGUSR1);
+			working=0;
+			continue;
+		}
 		int commands_number;
 		char** pipelined_commands = create_commnads_array(buffer,length,&commands_number);
 
@@ -538,6 +550,16 @@ FILE* execute(char* command){
   	return fp;
     
 
+}
+
+void close_reading_sockets(){
+	for(int i = 0; i< max_clients ;i++){
+		if(connection_list[i].socket != -1){
+			close(connection_list[i].socket);
+			connection_list[i].socket = -1;
+			connection_list[i].command_code = -1;
+		}
+	}
 }
 
 /*function to get size of the file.*/
