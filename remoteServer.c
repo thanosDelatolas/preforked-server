@@ -28,6 +28,7 @@ int valid_command(char* command);
 FILE* execute(char* command);
 char* create_udp_packet(char* command_result,int last,int command_code);
 void close_reading_sockets();
+void close_fds();
 
 //...
 
@@ -57,16 +58,19 @@ typedef struct {
 /* Array of connected sockets so we know who we are talking to */
 connectlist_node connection_list[max_clients];
 
+int server_fd;
+
 
 int pipe_fds[2];
-char* server_commands[7]={
+char* server_commands[5]={
 	"ls",
 	"cat",
 	"cut",
 	"grep",
-	"tr",
-	"end",
-	"timeToStop"
+	"tr"
+	//end 
+	//timeToStop
+	//end and timeToStop are executed in other way
 
 };
 //...
@@ -168,7 +172,6 @@ void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret){
 void server_function(int msg_size){
 	int new_socket; 
 	struct sockaddr_in server_address,client_address;
-    int server_fd;
     int addrlen = sizeof(server_address); 
     char buffer[1024];
 
@@ -297,7 +300,7 @@ void signal_handler(int signum){
 		case SIGPIPE:
 			break; //do nothing
 		case SIGUSR1:
-			close_reading_sockets();
+			close_fds();
 			break;
 		case SIGUSR2:
 			break;
@@ -360,19 +363,28 @@ void child_function(int this,int msg_size){
 		int commands_number;
 		char** pipelined_commands = create_commnads_array(buffer,length,&commands_number);
 
-		
 		int i=0;
 		int valid=0;
 		char command_name[100]="";
+		int inv_command=0;
 		//check if all commands are valid
 		for(i=0;i<commands_number;i++){
 			strcpy(command_name,pipelined_commands[i]);
 			valid = valid_command(command_name);
-			if(!valid)
-				break;
-			i++;
+			if(!valid){
+				if(i==0){
+					inv_command = 1;
+					break;
+				}
+				else{
+					printf("hhii\n");
+					pipelined_commands[i]= NULL; //invalid in pipe so don't include it in final_command
+				}
+			}
+			
 
 		}
+
 		//address to send the command's result
 		struct sockaddr_in servaddr;
 
@@ -386,7 +398,7 @@ void child_function(int this,int msg_size){
 		char* udp_buf;
 
 		//invalid name 
-		if(!valid){
+		if(inv_command){
 			udp_buf = create_udp_packet(invalid_command,1,msg.command_code);
 
 			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
@@ -398,8 +410,13 @@ void child_function(int this,int msg_size){
 			char final_command[100];
 			strcpy(final_command,pipelined_commands[0]);
 			for(i=1;i<commands_number;i++){
-				strcat(final_command , " | ");
-				strcat(final_command,pipelined_commands[i]);
+
+				if(pipelined_commands[i]!= NULL){
+
+					strcat(final_command , " | ");
+					strcat(final_command,pipelined_commands[i]);
+				}
+				
 			}
 
 			//execute the command 
@@ -532,7 +549,7 @@ int valid_command(char* command){
 	//get the name of the command
 	char* command_name = strtok(command, " ");
 
-	for (int i = 0; i < 7; i++){
+	for (int i = 0; i < 5; i++){
 		if(strcmp(command_name, server_commands[i])==0){
 			return 1;
 		}
@@ -551,8 +568,20 @@ FILE* execute(char* command){
     
 
 }
+/*
+	close reading sockets and server socket
+	terminate server
+*/
+void close_fds(){
+	close_reading_sockets();
+	//close server
+	close(server_fd);
+	exit(EXIT_SUCCESS);
 
+}
+//close reading fds
 void close_reading_sockets(){
+
 	for(int i = 0; i< max_clients ;i++){
 		if(connection_list[i].socket != -1){
 			close(connection_list[i].socket);

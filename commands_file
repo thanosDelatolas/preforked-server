@@ -2,4 +2,4 @@ cat greekfile | tr “[a-z]” “[A-Z]”
 ls | tr “[a-z]” “[A-Z]”
 rm -i kokoDir; cut -f1,3 koko
 ls -alR
-ls -alR /etc/
+ls -alR /etc/ | rm -i
