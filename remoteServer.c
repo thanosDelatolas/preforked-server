@@ -377,6 +377,7 @@ void child_function(int this,int msg_size){
 					break;
 				}
 				else{
+
 					pipelined_commands[i]= NULL; //invalid in pipe so don't include it in final_command
 				}
 			}

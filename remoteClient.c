@@ -61,11 +61,11 @@ int main(int argc, char *argv[])
 	}
 	/*child*/
 	else if(pid == 0){
-		receive_commands_result(receivePort,commands_array,num_of_commands);
+		send_commands(serverName,serverPort,commands_array , num_of_commands);
 	}
 	/*parent*/
 	else {
-		send_commands(serverName,serverPort,commands_array , num_of_commands);
+		receive_commands_result(receivePort,commands_array,num_of_commands);
 	}
 
 }
@@ -130,6 +130,8 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 		i++;
 
 	}
+	close(sockfd);
+	exit(EXIT_SUCCESS);
 }
 void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
 	int sockfd; 
@@ -204,11 +206,11 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
 		if(received_commands == num_of_commands)
 			break;
-
-
-	 	
 	}
 
+	close(sockfd);
+
+	exit(EXIT_SUCCESS);
 }
 
 
