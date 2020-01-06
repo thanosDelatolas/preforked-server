@@ -68,6 +68,8 @@ int main(int argc, char *argv[])
 		receive_commands_result(receivePort,commands_array,num_of_commands);
 	}
 
+	exit(EXIT_SUCCESS);
+
 }
 void send_receive_port(int receivePort, int serverPort){
 
@@ -131,7 +133,6 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 
 	}
 	close(sockfd);
-	exit(EXIT_SUCCESS);
 }
 void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
 	int sockfd; 
@@ -204,13 +205,13 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 			fputs(cmd_res, fp);
 		}
 
-		if(received_commands == num_of_commands)
+		if(received_commands == num_of_commands){
 			break;
+		}
 	}
 
 	close(sockfd);
 
-	exit(EXIT_SUCCESS);
 }
 
 
@@ -231,7 +232,6 @@ command_struct** create_commands_array(char* filename,int* n){
     while(1){
 
     	if ((read = getline(&command, &len, fp)) == -1){
-    		
 			/*end of file*/
 			fclose(fp);
 			break;
