@@ -190,6 +190,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		if(new_cmd == 1){
 			//create the name of the file
 			snprintf(filePath, 20, "output.%d.%d", receivePort,(msg.command_num+1)); 
+			fclose(fopen(filePath, "w"));//clear the file if already exists
 			fp = fopen(filePath, "a");
 			new_cmd = 0;
 		}
