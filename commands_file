@@ -3,3 +3,6 @@ ls | tr “[a-z]” “[A-Z]”
 rm -i kokoDir; cut -f1,3 koko
 ls -alR
 ls -alR /etc/ | rm -i
+rm
+ls -alR; ls -alR /etc/ | tr “[a-z]” “[A-Z]”
+rm

@@ -178,7 +178,6 @@ void server_function(int msg_size){
     /* 
 	   call create_TCP_SOCKET to create a socket, bind it and place it in passive mode
        once the call returns call accept on listening socket to accept the incoming requests
-
     */
 
     create_TCP_SOCKET(&server_fd, &server_address);
@@ -637,5 +636,3 @@ void trim(char * str)
     /* Mark the next character to last non white space character as NULL */
     str[index + 1] = '\0';
 }
-
-

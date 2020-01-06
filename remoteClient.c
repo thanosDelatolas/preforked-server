@@ -176,7 +176,8 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
     FILE* fp = NULL;
     char filePath[20] = {0};
 
-    int new_cmd=1;
+    
+    int prev_cmd=-1;
 	while(1){
 		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
 		
@@ -187,19 +188,17 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
 		strcpy(cmd_res,msg.command_result);
 
-		if(new_cmd == 1){
+		if(prev_cmd !=  msg.command_num){
 			//create the name of the file
 			snprintf(filePath, 20, "output.%d.%d", receivePort,(msg.command_num+1)); 
-			fclose(fopen(filePath, "w"));//clear the file if already exists
 			fp = fopen(filePath, "a");
-			new_cmd = 0;
+			prev_cmd = msg.command_num;
 		}
 
 		if(msg.last == 1) {
 			fputs(cmd_res, fp);
 			received_commands++;
 			fclose(fp);
-			new_cmd =1;
 
 		}
 		else{
