@@ -176,8 +176,10 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
     FILE* fp = NULL;
     char filePath[20] = {0};
 
-    
+	//just to know if we need open new file 
+	//current and previous udp packet doesn't refer to the same packet    
     int prev_cmd=-1;
+    
 	while(1){
 		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
 		
@@ -189,21 +191,28 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		strcpy(cmd_res,msg.command_result);
 
 		if(prev_cmd !=  msg.command_num){
+
+			//close previous file
+			if(fp != NULL)
+				fclose(fp);
+
 			//create the name of the file
 			snprintf(filePath, 20, "output.%d.%d", receivePort,(msg.command_num+1)); 
+			//open file
 			fp = fopen(filePath, "a");
+
 			prev_cmd = msg.command_num;
 		}
 
 		if(msg.last == 1) {
 			fputs(cmd_res, fp);
 			received_commands++;
-			fclose(fp);
 
 		}
 		else{
 			fputs(cmd_res, fp);
 		}
+
 
 		if(received_commands == num_of_commands){
 			break;
