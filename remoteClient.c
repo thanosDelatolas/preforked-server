@@ -12,7 +12,6 @@
 typedef struct 
 {
 	char command_name[100];
-	int answered; //for 2 or more same commands
 }command_struct;
 
 typedef struct{
@@ -24,10 +23,12 @@ typedef struct{
 
 
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,int dw_commands);
 void send_receive_port(int receivePort, int serverPort);
+void trim(char * str);
 
-command_struct** create_commands_array(char* filename,int* n);
+//last input is the number of commands end,timeToStop
+command_struct** create_commands_array(char* filename,int* n,int* dw_commands);
 
 
 
@@ -48,9 +49,9 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	
-	int num_of_commands=-1;
-
-	command_struct** commands_array=create_commands_array(filename,&num_of_commands);
+	int num_of_commands=0;
+	int dw_commands=0;
+	command_struct** commands_array=create_commands_array(filename,&num_of_commands,&dw_commands);
 
 	send_receive_port(receivePort,serverPort);
 
@@ -65,7 +66,7 @@ int main(int argc, char *argv[])
 	}
 	/*parent*/
 	else {
-		receive_commands_result(receivePort,commands_array,num_of_commands);
+		receive_commands_result(receivePort,commands_array,num_of_commands,dw_commands);
 	}
 
 	exit(EXIT_SUCCESS);
@@ -134,7 +135,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 	}
 	close(sockfd);
 }
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,int dw_commands){
 	int sockfd; 
 
     char buffer[PACKET_SIZE]; // receive up to 512 bytes
@@ -179,6 +180,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 	//just to know if we need open new file 
 	//current and previous udp packet doesn't refer to the same packet    
     int prev_cmd=-1;
+    printf("%d\n", dw_commands);
     
 	while(1){
 		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
@@ -214,7 +216,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		}
 
 
-		if(received_commands == num_of_commands){
+		if(received_commands == (num_of_commands-dw_commands)){
 			break;
 		}
 	}
@@ -228,11 +230,12 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
  create commands array
 */
 
-command_struct** create_commands_array(char* filename,int* n){
+command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
 	FILE* fp;
     char * command = NULL;
     size_t len = 0;
     ssize_t read;
+    int dw_cmd=0;
     command_struct** commands_array = NULL;
 
     int num_of_commands=0;
@@ -252,13 +255,63 @@ command_struct** create_commands_array(char* filename,int* n){
 
 		commands_array = (command_struct**)realloc (commands_array, sizeof (command_struct*) * (num_of_commands+1));
 		commands_array[num_of_commands] = (command_struct*)malloc(sizeof(command_struct));
-
-		commands_array[num_of_commands] -> answered = 0;
+		trim(command);
 		strcpy(commands_array[num_of_commands] -> command_name,command);
+		if (strcmp(command,"end")==0 || strcmp(command,"timeToStop")==0 ){
+			printf("hii\n");
+			dw_cmd ++;
+		}
+		
 		num_of_commands ++;
+		
+		
 
 
     }
     *n = num_of_commands;
+    *dw_commands = dw_cmd;
     return commands_array;
+}
+
+
+void trim(char * str)
+{
+    int index, i;
+
+    /*
+     * Trim leading white spaces
+     */
+    index = 0;
+    while(str[index] == ' ' || str[index] == '\t' || str[index] == '\n')
+    {
+        index++;
+    }
+
+    /* Shift all trailing characters to its left */
+    i = 0;
+    while(str[i + index] != '\0')
+    {
+        str[i] = str[i + index];
+        i++;
+    }
+    str[i] = '\0'; // Terminate string with NULL
+
+
+    /*
+     * Trim trailing white spaces
+     */
+    i = 0;
+    index = -1;
+    while(str[i] != '\0')
+    {
+        if(str[i] != ' ' && str[i] != '\t' && str[i] != '\n')
+        {
+            index = i;
+        }
+
+        i++;
+    }
+
+    /* Mark the next character to last non white space character as NULL */
+    str[index + 1] = '\0';
 }

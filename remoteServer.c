@@ -19,7 +19,7 @@
 
 void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret);
 void server_function(int msg_size);
-void child_function(int this,int msg_size);
+void child_function(int msg_size);
 void signal_handler(int signum);
 void trim(char * str);
 char** create_commnads_array(char* command,int length,int* commands_number);
@@ -29,14 +29,18 @@ FILE* execute(char* command);
 char* create_udp_packet(char* command_result,int last,int command_code);
 void close_reading_sockets();
 void close_fds();
+void end_func();
+void timeToStop_func();
+void free_workers_array();
+
 
 //...
 
 //gloabl variables
 
-int portNumber,numChildren;
+int portNumber,numChildren,activeChildren;
 
-
+pid_t* workers_array;
 typedef struct{
 	char cmd[100];
 	int port;
@@ -84,6 +88,7 @@ int main(int argc,char *argv[]){
 
 	portNumber = atoi(argv[1]);
 	numChildren = atoi(argv[2]);
+	activeChildren = numChildren;
 
 	if(numChildren < 1){ perror("At least one child is required"); exit(EXIT_FAILURE); }
 
@@ -102,8 +107,11 @@ int main(int argc,char *argv[]){
 
     int msg_size =sizeof(server_worker_msg);
    	pid_t temp;
-   
-     /* create numChildren child-process*/
+
+   	/* allocate space for worikers_array*/
+   	workers_array = (pid_t*)malloc(numChildren * sizeof(pid_t));
+
+    /* create numChildren child-process*/
     for (int i = 0; i < numChildren; i++){
     	temp = fork();
 
@@ -114,10 +122,11 @@ int main(int argc,char *argv[]){
     	/*child*/
     	else if( temp == 0 ){
     		
-			child_function(i,msg_size); //never ends
+			child_function(msg_size); //never ends
     	}
     	/*parent*/
     	else{
+    		workers_array[i] = temp;
 
     	}   
 	} 
@@ -299,14 +308,14 @@ void signal_handler(int signum){
 		case SIGPIPE:
 			break; //do nothing
 		case SIGUSR1:
-			close_fds();
+			end_func();
 			break;
 		case SIGUSR2:
 			break;
 	}
 }
 
-void child_function(int this,int msg_size){
+void child_function(int msg_size){
 	
 	close(pipe_fds[1]); // child doesn't write...
 	char task[msg_size]; 
@@ -349,15 +358,19 @@ void child_function(int this,int msg_size){
 		char buffer [1024]={0};
 		strcpy(buffer,msg.cmd);
 
-		
-		
-		trim(buffer);
 		length = strlen(buffer);
 
 		if(strcmp(buffer,"end")==0){
+
+			//inform father that this child is about to exit
 			kill(getppid(),SIGUSR1);
-			working=0;
-			continue;
+			//close pipe read-end
+			close(pipe_fds[0]);
+
+			//close socket for command's answerss
+			close(sockfd);
+
+			exit(EXIT_SUCCESS);
 		}
 		int commands_number;
 		char** pipelined_commands = create_commnads_array(buffer,length,&commands_number);
@@ -483,7 +496,7 @@ void child_function(int this,int msg_size){
 	
 }
 
-
+/*	children's Functions   */
 char* create_udp_packet(char* command_result,int last,int command_code){
 	udp_msg msg;
 
@@ -567,10 +580,25 @@ FILE* execute(char* command){
     
 
 }
+/*	end of children's Functions   */
+
+/* signal handler functions */
+
 /*
 	close reading sockets and server socket
 	terminate server
 */
+void end_func(){
+	activeChildren--;
+
+	//terminate the server
+	if(activeChildren == 0 ){
+		free_workers_array();
+		close_fds();
+	}
+
+}
+
 void close_fds(){
 	close_reading_sockets();
 	//close server
@@ -589,8 +617,15 @@ void close_reading_sockets(){
 		}
 	}
 }
+void free_workers_array(){
 
-/*function to get size of the file.*/
+	for(int i =0;i < numChildren ; i++){
+		workers_array[i] = -1;
+	}
+	free(workers_array);
+}
+/*end of signal handler functions */
+
 
 /**
  * Remove leading and trailing white space characters
