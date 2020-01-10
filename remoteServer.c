@@ -14,6 +14,7 @@
 #define max_clients 20 
 #define PACKET_SIZE 512
 #define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
+#define SERVER_CLOSED "serverClosed"
 
 //Functions...
 
@@ -32,6 +33,7 @@ void close_fds();
 void end_func();
 void timeToStop_func();
 void free_workers_array();
+void send_stop_msg();
 
 
 //...
@@ -57,6 +59,7 @@ typedef struct{
 typedef struct {
   int socket;
   int command_code;
+  int port;
 } connectlist_node;
 
 /* Array of connected sockets so we know who we are talking to */
@@ -272,12 +275,14 @@ void server_function(int msg_size){
 				if(strcmp(buffer,"receivePort")==0){
 					ptr = strtok(NULL, ":");
 					receivePort=atoi(ptr);
+					connection_list[i].port = receivePort;
 					continue;
 				}
 				if(strlen(buffer) > 100)
 					continue;
 	
 				connection_list[i].command_code ++;
+
 
 				//create the message
 				server_worker_msg msg;
@@ -600,6 +605,9 @@ void end_func(){
 }
 
 void close_fds(){
+	//inform client that serve is closing
+	send_stop_msg();
+
 	close_reading_sockets();
 	//close server
 	close(server_fd);
@@ -609,11 +617,13 @@ void close_fds(){
 //close reading fds
 void close_reading_sockets(){
 
+
 	for(int i = 0; i< max_clients ;i++){
 		if(connection_list[i].socket != -1){
 			close(connection_list[i].socket);
 			connection_list[i].socket = -1;
 			connection_list[i].command_code = -1;
+			connection_list[i].port = -1;
 		}
 	}
 }
@@ -623,6 +633,43 @@ void free_workers_array(){
 		workers_array[i] = -1;
 	}
 	free(workers_array);
+}
+/*
+	inform all clients that server is closed
+*/
+void send_stop_msg(){
+	int sockfd;
+
+	//address to send the command's result
+	struct sockaddr_in servaddr;
+
+  	memset(&servaddr, 0, sizeof(servaddr)); 
+      
+    // Filling server information 
+    servaddr.sin_family = AF_INET; 
+   	servaddr.sin_addr.s_addr = INADDR_ANY;
+	
+	//...
+	char* udp_buf;
+
+	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+
+  		perror("socket creation failed"); exit(EXIT_FAILURE); 
+  	}
+
+	for (int i = 0; i < max_clients; i++)
+	{
+		if(connection_list[i].socket != -1){
+
+			//get each client's receive port
+			servaddr.sin_port = htons(connection_list[i].port);
+			udp_buf = create_udp_packet(SERVER_CLOSED,0,0);
+
+			sendto(sockfd, udp_buf, PACKET_SIZE, MSG_CONFIRM, 
+				(struct sockaddr *) &servaddr,sizeof(servaddr));
+		}
+	}
+
 }
 /*end of signal handler functions */
 

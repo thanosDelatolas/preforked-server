@@ -7,6 +7,7 @@
 
 #define PACKET_SIZE 512
 #define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
+#define SERVER_CLOSED "serverClosed"
 
 
 typedef struct 
@@ -191,6 +192,10 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		memcpy(&msg ,buffer, PACKET_SIZE);
 
 		strcpy(cmd_res,msg.command_result);
+
+		if(strcmp(cmd_res,SERVER_CLOSED) == 0){
+			exit(EXIT_FAILURE);
+		}
 
 		if(prev_cmd !=  msg.command_num){
 
