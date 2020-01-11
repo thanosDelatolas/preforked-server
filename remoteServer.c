@@ -191,6 +191,7 @@ void server_function(int msg_size){
     int addrlen = sizeof(server_address); 
     char buffer[1024];
 
+    
     /* 
 	   call create_TCP_SOCKET to create a socket, bind it and place it in passive mode
        once the call returns call accept on listening socket to accept the incoming requests

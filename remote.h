@@ -1,4 +1,3 @@
-
 #define PACKET_SIZE 512
 #define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
 #define SERVER_CLOSED "serverClosed"
@@ -57,4 +56,3 @@ static inline void trim(char * str)
     /* Mark the next character to last non white space character as NULL */
     str[index + 1] = '\0';
 }
-
