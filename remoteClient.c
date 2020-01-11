@@ -4,10 +4,8 @@
 #include <unistd.h> 
 #include <string.h>  
 #include <stdlib.h>
+#include "remote.h"
 
-#define PACKET_SIZE 512
-#define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
-#define SERVER_CLOSED "serverClosed"
 
 
 typedef struct 
@@ -181,7 +179,6 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 	//just to know if we need open new file 
 	//current and previous udp packet doesn't refer to the same packet    
     int prev_cmd=-1;
-    printf("%d\n", dw_commands);
     
 	while(1){
 		n = recvfrom(sockfd,buffer, PACKET_SIZE,MSG_WAITALL, ( struct sockaddr *) &cliaddr,(socklen_t*)&len);
@@ -262,8 +259,7 @@ command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
 		commands_array[num_of_commands] = (command_struct*)malloc(sizeof(command_struct));
 		trim(command);
 		strcpy(commands_array[num_of_commands] -> command_name,command);
-		if (strcmp(command,"end")==0 || strcmp(command,"timeToStop")==0 ){
-			printf("hii\n");
+		if (strcmp(command,END)==0 || strcmp(command,TIME_TO_STOP)==0 ){
 			dw_cmd ++;
 		}
 		
@@ -276,47 +272,4 @@ command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
     *n = num_of_commands;
     *dw_commands = dw_cmd;
     return commands_array;
-}
-
-
-void trim(char * str)
-{
-    int index, i;
-
-    /*
-     * Trim leading white spaces
-     */
-    index = 0;
-    while(str[index] == ' ' || str[index] == '\t' || str[index] == '\n')
-    {
-        index++;
-    }
-
-    /* Shift all trailing characters to its left */
-    i = 0;
-    while(str[i + index] != '\0')
-    {
-        str[i] = str[i + index];
-        i++;
-    }
-    str[i] = '\0'; // Terminate string with NULL
-
-
-    /*
-     * Trim trailing white spaces
-     */
-    i = 0;
-    index = -1;
-    while(str[i] != '\0')
-    {
-        if(str[i] != ' ' && str[i] != '\t' && str[i] != '\n')
-        {
-            index = i;
-        }
-
-        i++;
-    }
-
-    /* Mark the next character to last non white space character as NULL */
-    str[index + 1] = '\0';
 }

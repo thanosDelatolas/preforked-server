@@ -5,5 +5,6 @@ ls -alR
 ls -alR /etc/ |   rm -i
 rm
 end
+timeToStop
 ls -alR; ls -alR /etc/ | tr “[a-z]” “[A-Z]”
 rm

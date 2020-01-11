@@ -9,12 +9,12 @@
 #include <signal.h> 
 #include <sys/wait.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO
+#include "remote.h"
+
 
 
 #define max_clients 20 
-#define PACKET_SIZE 512
-#define UPD_CMD_SIZE PACKET_SIZE - 2*sizeof(int)
-#define SERVER_CLOSED "serverClosed"
+
 
 //Functions...
 
@@ -22,14 +22,13 @@ void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret);
 void server_function(int msg_size);
 void child_function(int msg_size);
 void signal_handler(int signum);
-void trim(char * str);
 char** create_commnads_array(char* command,int length,int* commands_number);
 int count_occurances(char* string,int length,char ch);
 int valid_command(char* command);
 FILE* execute(char* command);
 char* create_udp_packet(char* command_result,int last,int command_code);
 void close_reading_sockets();
-void close_fds();
+void close_fds(int closed_pipe,int print_stderr);
 void end_func();
 void timeToStop_func();
 void free_workers_array();
@@ -42,7 +41,15 @@ void send_stop_msg();
 
 int portNumber,numChildren,activeChildren;
 
-pid_t* workers_array;
+pid_t* workers_array; //array with pids of children
+
+pid_t parent;
+
+/*
+	this variable will be changed to 1 for each child from father	
+*/
+int timeToStop=0;
+
 typedef struct{
 	char cmd[100];
 	int port;
@@ -113,6 +120,7 @@ int main(int argc,char *argv[]){
 
    	/* allocate space for worikers_array*/
    	workers_array = (pid_t*)malloc(numChildren * sizeof(pid_t));
+   	parent = getpid();
 
     /* create numChildren child-process*/
     for (int i = 0; i < numChildren; i++){
@@ -316,6 +324,15 @@ void signal_handler(int signum){
 			end_func();
 			break;
 		case SIGUSR2:
+
+			if(getpid() == parent){
+
+				timeToStop_func();
+			}
+			else{
+				//make each child variable timeToStop 1 
+				timeToStop=1;
+			}
 			break;
 	}
 }
@@ -338,6 +355,20 @@ void child_function(int msg_size){
 
 	while(1){
 		
+		//check if each child's varaible timeToStop is one
+		if(timeToStop){
+			//close pipe read-end
+			close(pipe_fds[0]);
+
+			//close socket for command's answerss
+			close(sockfd);
+
+			//print in stderr
+			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
+
+			exit(EXIT_SUCCESS);
+		}
+
 		//wait for a task...
 		if(!working){
 
@@ -365,7 +396,7 @@ void child_function(int msg_size){
 
 		length = strlen(buffer);
 
-		if(strcmp(buffer,"end")==0){
+		if(strcmp(buffer,END)==0){
 
 			//inform father that this child is about to exit
 			kill(getppid(),SIGUSR1);
@@ -377,6 +408,22 @@ void child_function(int msg_size){
 
 			exit(EXIT_SUCCESS);
 		}
+		if(strcmp(buffer,TIME_TO_STOP)==0){
+			kill(getppid(),SIGUSR2);
+
+			//close pipe read-end
+			close(pipe_fds[0]);
+
+			//close socket for command's answerss
+			close(sockfd);
+
+			//print in stderr
+			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
+
+			exit(EXIT_SUCCESS);
+
+		}
+		
 		int commands_number;
 		char** pipelined_commands = create_commnads_array(buffer,length,&commands_number);
 
@@ -599,18 +646,47 @@ void end_func(){
 	//terminate the server
 	if(activeChildren == 0 ){
 		free_workers_array();
-		close_fds();
+		close_fds(0,0);
 	}
 
 }
 
-void close_fds(){
+void timeToStop_func(){
+	//father close pipe write-end because read is blocking I/O
+	close(pipe_fds[1]);
+
+	//inform all children that is time to stop
+	for (int i = 0; i < numChildren; i++){
+		kill(workers_array[i],SIGUSR2);
+	}
+
+	//wait all children to finish
+	int wpid;
+
+	while ((wpid = wait(NULL)) > 0); // this way, the father waits for all the child processes 
+
+
+	free_workers_array();
+
+	//close all sockets infrom all clients and exit
+	close_fds(1,1);
+}
+
+void close_fds(int closed_pipe,int print_stderr){
+
+	if(!closed_pipe)
+		close(pipe_fds[1]);
+
 	//inform client that serve is closing
 	send_stop_msg();
 
 	close_reading_sockets();
 	//close server
 	close(server_fd);
+
+	if(print_stderr)
+		fprintf( stderr, "\nParent process with pid %d is terminated.\n", getpid());
+
 	exit(EXIT_SUCCESS);
 
 }
@@ -672,49 +748,3 @@ void send_stop_msg(){
 
 }
 /*end of signal handler functions */
-
-
-/**
- * Remove leading and trailing white space characters
- */
-void trim(char * str)
-{
-    int index, i;
-
-    /*
-     * Trim leading white spaces
-     */
-    index = 0;
-    while(str[index] == ' ' || str[index] == '\t' || str[index] == '\n')
-    {
-        index++;
-    }
-
-    /* Shift all trailing characters to its left */
-    i = 0;
-    while(str[i + index] != '\0')
-    {
-        str[i] = str[i + index];
-        i++;
-    }
-    str[i] = '\0'; // Terminate string with NULL
-
-
-    /*
-     * Trim trailing white spaces
-     */
-    i = 0;
-    index = -1;
-    while(str[i] != '\0')
-    {
-        if(str[i] != ' ' && str[i] != '\t' && str[i] != '\n')
-        {
-            index = i;
-        }
-
-        i++;
-    }
-
-    /* Mark the next character to last non white space character as NULL */
-    str[index + 1] = '\0';
-}
