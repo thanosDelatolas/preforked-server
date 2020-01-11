@@ -177,7 +177,7 @@ void create_TCP_SOCKET(int* server_fd_ret,struct sockaddr_in* server_addr_ret){
 	   specify the max no. of connections
  	*/
 
- 	if(listen(server_fd,1000)<0){
+ 	if(listen(server_fd,20)<0){
  		perror("Can't create listener..."); exit(EXIT_FAILURE);
  	}
  	*server_fd_ret = server_fd;
@@ -191,7 +191,7 @@ void server_function(int msg_size){
     int addrlen = sizeof(server_address); 
     char buffer[1024];
 
-    
+
     /* 
 	   call create_TCP_SOCKET to create a socket, bind it and place it in passive mode
        once the call returns call accept on listening socket to accept the incoming requests
@@ -392,30 +392,59 @@ void child_function(int msg_size){
 		strcpy(buffer,msg.cmd);
 
 		length = strlen(buffer);
+		char* udp_buf;
+
+		//address to send the command's result
+		struct sockaddr_in servaddr;
+
+	  	memset(&servaddr, 0, sizeof(servaddr)); 
+      
+	    // Filling server information 
+	    servaddr.sin_family = AF_INET; 
+	   	servaddr.sin_addr.s_addr = INADDR_ANY;
+		servaddr.sin_port = htons(msg.port);
+		//...
+		
 
 		if(strcmp(buffer,END)==0){
+
+			char end_cmd_res[100]={0};
+			snprintf(end_cmd_res, 100, "end command\nPid of child:%d", getpid()); 
+			udp_buf = create_udp_packet(end_cmd_res,1,msg.command_code);
+
+			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
+						(struct sockaddr *) &servaddr,sizeof(servaddr));
 
 			//inform father that this child is about to exit
 			kill(getppid(),SIGUSR1);
 			//close pipe read-end
 			close(pipe_fds[0]);
 
-			//close socket for command's answerss
 			close(sockfd);
+
 
 			exit(EXIT_SUCCESS);
 		}
 		if(strcmp(buffer,TIME_TO_STOP)==0){
+
+			//print in stderr
+			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
+
+			char timeToStop_cmd_res[100]="timeToStop command";
+			
+			udp_buf = create_udp_packet(timeToStop_cmd_res,1,msg.command_code);
+
+			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
+						(struct sockaddr *) &servaddr,sizeof(servaddr));
+
 			kill(getppid(),SIGUSR2);
 
 			//close pipe read-end
 			close(pipe_fds[0]);
 
+
 			//close socket for command's answerss
 			close(sockfd);
-
-			//print in stderr
-			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
 
 			exit(EXIT_SUCCESS);
 
@@ -445,18 +474,6 @@ void child_function(int msg_size){
 			
 
 		}
-
-		//address to send the command's result
-		struct sockaddr_in servaddr;
-
-	  	memset(&servaddr, 0, sizeof(servaddr)); 
-      
-	    // Filling server information 
-	    servaddr.sin_family = AF_INET; 
-	   	servaddr.sin_addr.s_addr = INADDR_ANY;
-		servaddr.sin_port = htons(msg.port);
-		//...
-		char* udp_buf;
 
 		//invalid name 
 		if(inv_command){

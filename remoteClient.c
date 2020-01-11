@@ -16,12 +16,12 @@ typedef struct
 
 
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,int dw_commands);
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
 void send_receive_port(int receivePort, int serverPort);
 void trim(char * str);
 
 //last input is the number of commands end,timeToStop
-command_struct** create_commands_array(char* filename,int* n,int* dw_commands);
+command_struct** create_commands_array(char* filename,int* n);
 
 
 
@@ -43,8 +43,7 @@ int main(int argc, char *argv[])
 	}
 	
 	int num_of_commands=0;
-	int dw_commands=0;
-	command_struct** commands_array=create_commands_array(filename,&num_of_commands,&dw_commands);
+	command_struct** commands_array=create_commands_array(filename,&num_of_commands);
 
 	send_receive_port(receivePort,serverPort);
 
@@ -59,7 +58,7 @@ int main(int argc, char *argv[])
 	}
 	/*parent*/
 	else {
-		receive_commands_result(receivePort,commands_array,num_of_commands,dw_commands);
+		receive_commands_result(receivePort,commands_array,num_of_commands);
 	}
 
 	exit(EXIT_SUCCESS);
@@ -128,7 +127,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 	}
 	close(sockfd);
 }
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,int dw_commands){
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
 	int sockfd; 
 
     char buffer[PACKET_SIZE]; // receive up to 512 bytes
@@ -212,7 +211,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		}
 
 
-		if(received_commands == (num_of_commands-dw_commands)){
+		if(received_commands == num_of_commands){
 			break;
 		}
 	}
@@ -226,12 +225,11 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
  create commands array
 */
 
-command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
+command_struct** create_commands_array(char* filename,int* n){
 	FILE* fp;
     char * command = NULL;
     size_t len = 0;
     ssize_t read;
-    int dw_cmd=0;
     command_struct** commands_array = NULL;
 
     int num_of_commands=0;
@@ -253,9 +251,7 @@ command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
 		commands_array[num_of_commands] = (command_struct*)malloc(sizeof(command_struct));
 		trim(command);
 		strcpy(commands_array[num_of_commands] -> command_name,command);
-		if (strcmp(command,END)==0 || strcmp(command,TIME_TO_STOP)==0 ){
-			dw_cmd ++;
-		}
+		
 		
 		num_of_commands ++;
 		
@@ -264,6 +260,5 @@ command_struct** create_commands_array(char* filename,int* n, int* dw_commands){
 
     }
     *n = num_of_commands;
-    *dw_commands = dw_cmd;
     return commands_array;
 }
