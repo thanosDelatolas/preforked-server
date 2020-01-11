@@ -13,12 +13,6 @@ typedef struct
 	char command_name[100];
 }command_struct;
 
-typedef struct{
-	int command_num;
-	int last;
-	char command_result[UPD_CMD_SIZE];
-}udp_msg;
-
 
 
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);

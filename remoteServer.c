@@ -57,11 +57,7 @@ typedef struct{
 	
 }server_worker_msg;
 
-typedef struct{
-	int command_num;
-	int last;
-	char command_result[UPD_CMD_SIZE];
-}udp_msg;
+
 
 typedef struct {
   int socket;
