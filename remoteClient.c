@@ -15,9 +15,9 @@ typedef struct
 
 
 
-void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands);
+void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands,int receivePort);
 void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
-void send_receive_port(int receivePort, int serverPort);
+void send_receive_port(int sockfd,int receivePort);
 void trim(char * str);
 
 //last input is the number of commands end,timeToStop
@@ -45,8 +45,6 @@ int main(int argc, char *argv[])
 	int num_of_commands=0;
 	command_struct** commands_array=create_commands_array(filename,&num_of_commands);
 
-	send_receive_port(receivePort,serverPort);
-
 	pid_t pid =fork();
 
 	if(pid <0 ){
@@ -54,7 +52,7 @@ int main(int argc, char *argv[])
 	}
 	/*child*/
 	else if(pid == 0){
-		send_commands(serverName,serverPort,commands_array , num_of_commands);
+		send_commands(serverName,serverPort,commands_array , num_of_commands ,receivePort);
 	}
 	/*parent*/
 	else {
@@ -64,33 +62,16 @@ int main(int argc, char *argv[])
 	exit(EXIT_SUCCESS);
 
 }
-void send_receive_port(int receivePort, int serverPort){
+void send_receive_port(int sockfd,int receivePort){
 
-	struct sockaddr_in servaddr;
-
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
-    servaddr.sin_port = htons(serverPort); 
-
-
-    int sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-   		perror("socket call"); exit(EXIT_FAILURE);
-	}
-
-   	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) { 
-    	perror("connection with the server failed...\n"); 
-    	exit(EXIT_FAILURE); 
-	} 
 
 	//send receivePort to the server
 	char port_message[1024] = {0};
 	snprintf(port_message, 1024, "receivePort:%d", receivePort); 
 	write(sockfd, port_message, 1024);
-	close(sockfd);
 
 }
-void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands){
+void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands,int receivePort){
 	int sent_commands=0;
 
 
@@ -110,7 +91,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
     	perror("connection with the server failed...\n"); 
     	exit(EXIT_FAILURE); 
 	} 
-	
+ 	send_receive_port(sockfd,receivePort);
 
    	int i=0;
 	while(i<num_of_commands){
@@ -184,6 +165,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		strcpy(cmd_res,msg.command_result);
 
 		if(strcmp(cmd_res,SERVER_CLOSED) == 0){
+			close(sockfd);
 			exit(EXIT_FAILURE);
 		}
 

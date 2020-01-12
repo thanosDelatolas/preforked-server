@@ -99,9 +99,13 @@ int main(int argc,char *argv[]){
 	if(numChildren < 1){ perror("At least one child is required"); exit(EXIT_FAILURE); }
 
 	//signals handlers....
-	signal(SIGPIPE,signal_handler);
-	signal(SIGUSR1,signal_handler);//command end
-	signal(SIGUSR2,signal_handler);//command timeToStop
+	struct sigaction action;
+  	action.sa_handler = signal_handler;
+  	action.sa_flags = SA_RESTART; //<-- restart 
+
+	sigaction(SIGUSR1, &action, NULL);//command end 
+	sigaction(SIGUSR2, &action, NULL);//command timeToStop
+	sigaction(SIGPIPE, &action, NULL);
 	//...
 
     //create pipe...
@@ -650,19 +654,17 @@ FILE* execute(char* command){
 
 /* signal handler functions */
 
-/*
-	close reading sockets and server socket
-	terminate server
-*/
+
 void end_func(){
 	activeChildren--;
-
 	//terminate the server
 	if(activeChildren == 0 ){
 		free_workers_array();
 		close_fds(0,0);
 	}
 
+
+	
 }
 
 void timeToStop_func(){
@@ -685,6 +687,11 @@ void timeToStop_func(){
 	//close all sockets infrom all clients and exit
 	close_fds(1,1);
 }
+
+/*
+	close reading sockets and server socket
+	terminate server
+*/
 
 void close_fds(int closed_pipe,int print_stderr){
 
@@ -717,6 +724,7 @@ void close_reading_sockets(){
 		}
 	}
 }
+
 void free_workers_array(){
 
 	for(int i =0;i < numChildren ; i++){
