@@ -7,3 +7,4 @@ rm
 end
 timeToStop
 ls -alR; ls -alR /etc/ | tr “[a-z]” “[A-Z]”
+cut

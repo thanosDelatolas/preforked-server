@@ -96,7 +96,8 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
    	int i=0;
 	while(i<num_of_commands){
 
-		//connected
+		//connected, it's time to send the commands
+
 		write(sockfd, commands_array[i] -> command_name, 1024); 
 		sent_commands++;
 		if(sent_commands == 9){

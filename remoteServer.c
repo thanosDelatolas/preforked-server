@@ -316,7 +316,7 @@ void server_function(int msg_size){
   				//write in pipe the serialized struct
 				write(pipe_fds[1],buffer_msg,msg_size);
 
-				//father wait for the child to exit
+				//father waits for the child to exit
 				if(strcmp(buffer,END)==0)
 					wait(NULL);
 
