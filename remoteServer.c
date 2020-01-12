@@ -431,6 +431,7 @@ void child_function(int msg_size){
 
 			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
 						(struct sockaddr *) &servaddr,sizeof(servaddr));
+			sleep(0.005);
 
 			//inform father that this child is about to exit
 			kill(getppid(),SIGUSR1);
