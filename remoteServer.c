@@ -13,7 +13,7 @@
 
 
 
-#define max_clients 20 
+#define max_clients 30 
 
 
 //Functions...
@@ -261,12 +261,17 @@ void server_function(int msg_size){
 			if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address,(socklen_t*)&addrlen))<0) { 
 				perror("accept"); exit(EXIT_FAILURE);
 			}
-
+			int accepted=0;
 			for (int i = 0; i < max_clients; i++){
 			 	if(connection_list[i].socket == 0 ){
 			 		connection_list[i].socket = new_socket;
+			 		accepted = 1;
 			 		break;
 			 	}
+		 	}
+		 	if(!accepted){
+		 		//inform the client tha server is full
+		 		send_stop_msg();
 		 	} 
 		}
 
@@ -448,6 +453,7 @@ void child_function(int msg_size){
 
 			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
 						(struct sockaddr *) &servaddr,sizeof(servaddr));
+			sleep(0.005);
 
 			kill(getppid(),SIGUSR2);
 
@@ -493,6 +499,7 @@ void child_function(int msg_size){
 
 			sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
 						(struct sockaddr *) &servaddr,sizeof(servaddr));
+			sleep(0.005);
 		}
 		else{
 
@@ -519,6 +526,7 @@ void child_function(int msg_size){
 
 				sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
 						(struct sockaddr *) &servaddr,sizeof(servaddr));
+				sleep(0.005);
 
 			}
 			//command is executed
@@ -539,6 +547,7 @@ void child_function(int msg_size){
 
     					sendto(sockfd, udp_buf, PACKET_SIZE , MSG_CONFIRM, 
 								(struct sockaddr *) &servaddr,sizeof(servaddr));
+    					sleep(0.005);
   						break;
     				}
         			command_result[n++] = (char) c;
@@ -551,6 +560,7 @@ void child_function(int msg_size){
 
         				sendto(sockfd, udp_buf, PACKET_SIZE, MSG_CONFIRM, 
   								(struct sockaddr *) &servaddr,sizeof(servaddr));
+        				sleep(0.005);
 
         				n = 0;
   						for (int i = 0; i < 512; ++i){
@@ -707,7 +717,7 @@ void close_fds(int closed_pipe,int print_stderr){
 	if(!closed_pipe)
 		close(pipe_fds[1]);
 
-	//inform client that serve is closing
+	//inform client that server is closing
 	send_stop_msg();
 
 	close_reading_sockets();
@@ -774,6 +784,7 @@ void send_stop_msg(){
 
 			sendto(sockfd, udp_buf, PACKET_SIZE, MSG_CONFIRM, 
 				(struct sockaddr *) &servaddr,sizeof(servaddr));
+			sleep(0.005);
 		}
 	}
 

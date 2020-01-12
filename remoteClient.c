@@ -5,6 +5,7 @@
 #include <string.h>  
 #include <stdlib.h>
 #include "remote.h"
+#include <signal.h>
 
 
 
@@ -16,9 +17,9 @@ typedef struct
 
 
 void send_commands(char* serverName,int serverPort,command_struct** commands_array, int num_of_commands,int receivePort);
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands);
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,pid_t child);
 void send_receive_port(int sockfd,int receivePort);
-void trim(char * str);
+void signal_handler(int signum);
 
 //last input is the number of commands end,timeToStop
 command_struct** create_commands_array(char* filename,int* n);
@@ -45,6 +46,9 @@ int main(int argc, char *argv[])
 	int num_of_commands=0;
 	command_struct** commands_array=create_commands_array(filename,&num_of_commands);
 
+	//signal to stop
+	signal(SIGUSR1,signal_handler);
+
 	pid_t pid =fork();
 
 	if(pid <0 ){
@@ -56,7 +60,7 @@ int main(int argc, char *argv[])
 	}
 	/*parent*/
 	else {
-		receive_commands_result(receivePort,commands_array,num_of_commands);
+		receive_commands_result(receivePort,commands_array,num_of_commands,pid);
 	}
 
 	exit(EXIT_SUCCESS);
@@ -84,10 +88,12 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 
     int sockfd;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    	kill(getppid(),SIGUSR1);
    		perror("socket call"); exit(EXIT_FAILURE);
 	}
 
    	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) { 
+   		kill(getppid(),SIGUSR1);
     	perror("connection with the server failed...\n"); 
     	exit(EXIT_FAILURE); 
 	} 
@@ -109,7 +115,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
 	}
 	close(sockfd);
 }
-void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands){
+void receive_commands_result(int receivePort,command_struct** commands_array, int num_of_commands,pid_t child){
 	int sockfd; 
 
     char buffer[PACKET_SIZE]; // receive up to 512 bytes
@@ -118,6 +124,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
     // Creating socket file descriptor 
     if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+    	kill(child,SIGUSR1);
         perror("socket creation failed"); exit(EXIT_FAILURE); 
     } 
 
@@ -129,6 +136,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 	
 
 	if(setsockopt(sockfd,SOL_SOCKET,SO_REUSEPORT,(const char*)&reuse,sizeof(reuse))<0){
+		kill(child,SIGUSR1);
 		perror("setsockopt(SO_REUSEPORT) failed\n"); exit(EXIT_FAILURE);
 	}
 
@@ -139,6 +147,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 
     // Bind the socket with the server address 
     if ( bind(sockfd, (struct sockaddr *)&servaddr,sizeof(servaddr)) < 0 ){ 
+    	kill(child,SIGUSR1);
         perror("bind failed"); exit(EXIT_FAILURE); 
     } 
 
@@ -166,6 +175,7 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 		strcpy(cmd_res,msg.command_result);
 
 		if(strcmp(cmd_res,SERVER_CLOSED) == 0){
+			kill(child,SIGUSR1);
 			close(sockfd);
 			exit(EXIT_FAILURE);
 		}
@@ -202,7 +212,11 @@ void receive_commands_result(int receivePort,command_struct** commands_array, in
 	close(sockfd);
 
 }
-
+void signal_handler(int signum){
+	if (signum == SIGUSR1){
+		exit(EXIT_SUCCESS);
+	}
+}
 
 /*
  create commands array
