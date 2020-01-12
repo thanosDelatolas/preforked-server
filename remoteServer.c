@@ -270,8 +270,6 @@ void server_function(int msg_size){
 			 	}
 		 	}
 		 	if(!accepted){
-		 		//inform the client tha server is full
-		 		send_stop_msg();
 		 		close(new_socket);
 		 	} 
 		}
