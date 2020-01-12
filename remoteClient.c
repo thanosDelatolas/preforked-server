@@ -230,6 +230,8 @@ command_struct** create_commands_array(char* filename,int* n){
     command_struct** commands_array = NULL;
 
     int num_of_commands=0;
+    char cmd_check[100];
+    char* ptr;
 
     fp = fopen(filename, "r");
     while(1){
@@ -247,6 +249,14 @@ command_struct** create_commands_array(char* filename,int* n){
 		commands_array = (command_struct**)realloc (commands_array, sizeof (command_struct*) * (num_of_commands+1));
 		commands_array[num_of_commands] = (command_struct*)malloc(sizeof(command_struct));
 		trim(command);
+
+		//check if the command is receivePort
+		strcpy(cmd_check,command);
+		ptr = strtok(cmd_check, ":");
+		if(strcmp(ptr,"receivePort")==0){
+			strcpy(command,"invalid");
+		}
+		
 		strcpy(commands_array[num_of_commands] -> command_name,command);
 		
 		

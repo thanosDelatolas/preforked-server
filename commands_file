@@ -3,6 +3,7 @@ ls |    tr “[a-z]” “[A-Z]”
 rm -i kokoDir; cut -f1,3 koko
 ls -alR
 ls -alR /etc/ |   rm -i
+ receivePort:2
 rm
 end
 timeToStop

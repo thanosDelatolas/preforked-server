@@ -6,9 +6,9 @@
 #define TIME_TO_STOP "timeToStop"
 
 typedef struct{
-	int command_num;
-	int last;
-	char command_result[UPD_CMD_SIZE];
+    int command_num;
+    int last;
+    char command_result[UPD_CMD_SIZE];
 }udp_msg;
 
 
