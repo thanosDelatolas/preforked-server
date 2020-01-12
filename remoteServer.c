@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO
 #include "remote.h"
+#include <stddef.h>
 
 
 
@@ -83,6 +84,7 @@ char* server_commands[5]={
 	//end and timeToStop are executed in other way
 
 };
+struct sigaction action;
 //...
 
 int main(int argc,char *argv[]){
@@ -99,9 +101,13 @@ int main(int argc,char *argv[]){
 	if(numChildren < 1){ perror("At least one child is required"); exit(EXIT_FAILURE); }
 
 	//signals handlers....
-	struct sigaction action;
   	action.sa_handler = signal_handler;
   	action.sa_flags = SA_RESTART; //<-- restart 
+
+  	sigemptyset (&action.sa_mask);
+  	sigaddset(&action.sa_mask,SIGUSR1);
+  	sigaddset(&action.sa_mask,SIGUSR2);
+  	sigaddset(&action.sa_mask,SIGPIPE);
 
 	sigaction(SIGUSR1, &action, NULL);//command end 
 	sigaction(SIGUSR2, &action, NULL);//command timeToStop
@@ -238,7 +244,6 @@ void server_function(int msg_size){
 		}
 
 		/* select() returns the number of sockets that are readable */
-
 		readsocks = select(highsock+1, &socks,NULL,NULL,NULL);
 
 		if(readsocks < 0){
@@ -311,6 +316,10 @@ void server_function(int msg_size){
   				//write in pipe the serialized struct
 				write(pipe_fds[1],buffer_msg,msg_size);
 
+				//father wait for the child to exit
+				if(strcmp(buffer,END)==0)
+					wait(NULL);
+
 			}
 		}
 	}
@@ -365,7 +374,7 @@ void child_function(int msg_size){
 			close(sockfd);
 
 			//print in stderr
-			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
+			fprintf( stderr, "\nChild process with pid %d is terminated.\n", getpid());
 
 			exit(EXIT_SUCCESS);
 		}
@@ -432,7 +441,7 @@ void child_function(int msg_size){
 		if(strcmp(buffer,TIME_TO_STOP)==0){
 
 			//print in stderr
-			fprintf( stderr, "\nChild process with pid %d is terminated.", getpid());
+			fprintf( stderr, "\nChild process with pid %d is terminated.\n", getpid());
 
 			char timeToStop_cmd_res[100]="timeToStop command";
 			
@@ -657,6 +666,7 @@ FILE* execute(char* command){
 
 void end_func(){
 	activeChildren--;
+	
 	//terminate the server
 	if(activeChildren == 0 ){
 		free_workers_array();

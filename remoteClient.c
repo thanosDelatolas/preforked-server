@@ -87,7 +87,7 @@ void send_commands(char* serverName,int serverPort,command_struct** commands_arr
    		perror("socket call"); exit(EXIT_FAILURE);
 	}
 
-   	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) { 
+   	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) { 
     	perror("connection with the server failed...\n"); 
     	exit(EXIT_FAILURE); 
 	} 
