@@ -1,11 +1,16 @@
 cat greekfile |   tr “[a-z]” “[A-Z]”
-ls |    tr “[a-z]” “[A-Z]”
+ls |  rm | tr “[a-z]” “[A-Z]”
 rm -i kokoDir; cut -f1,3 koko
 ls -alR
 ls -alR /etc/ |   rm -i
  receivePort:2
 rm
 end
-timeToStop
 ls -alR; ls -alR /etc/ | tr “[a-z]” “[A-Z]”
 cut
+ls
+ls
+ls
+end
+timeToStop
+ls
